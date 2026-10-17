@@ -23,10 +23,10 @@ export const metadata: Metadata = {
     siteName: "MEP 2027",
     images: [
       {
-        url: "https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1600&auto=format&fit=crop",
-        width: 1600,
-        height: 900,
-        alt: "New Year 2027 MEP Invitation",
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "MEP 2027 – New Year Celebration",
       },
     ],
   },
@@ -35,9 +35,7 @@ export const metadata: Metadata = {
     title: "MEP Invitation 2027 – New Year Celebration",
     description:
       "Join the New Year 2027 MEP: a 30-member initiative led by 3 leaders and 3 co-leaders. Apply as Leader or Co-Leader today!",
-    images: [
-      "https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1600&auto=format&fit=crop",
-    ],
+    images: ["/og-image.png"],
   },
   icons: {
     icon: [
