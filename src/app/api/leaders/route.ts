@@ -4,6 +4,8 @@ import { leaders } from '@/db/schema';
 import { sql, asc, eq } from 'drizzle-orm';
 import { isAdminRequest } from '@/lib/admin-auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const allLeaders = await db

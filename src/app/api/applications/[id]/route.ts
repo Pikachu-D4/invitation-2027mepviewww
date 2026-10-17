@@ -4,6 +4,8 @@ import { applications } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { isAdminRequest } from '@/lib/admin-auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function DELETE(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },

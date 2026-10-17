@@ -4,6 +4,8 @@ import { applications, leaders } from '@/db/schema';
 import { eq, desc, asc } from 'drizzle-orm';
 import { isAdminRequest } from '@/lib/admin-auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   if (!isAdminRequest(request)) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
