@@ -1,0 +1,1 @@
+ALTER TABLE `applications` ADD `profile_image` text NOT NULL;

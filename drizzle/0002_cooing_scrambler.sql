@@ -1,0 +1,1 @@
+ALTER TABLE `leaders` ADD `position` integer NOT NULL;
