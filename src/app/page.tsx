@@ -1384,6 +1384,24 @@ function About({ about, onAboutCta }: { about: SiteContent['about']; onAboutCta?
   );
 }
 
+const SLOT_BACKDROPS: Record<number, string> = {
+  1: '/slots/slot-1.png',
+  2: '/slots/slot-2.png',
+  3: '/slots/slot-3.png',
+  4: '/slots/slot-4.png',
+  5: '/slots/slot-5.png',
+  6: '/slots/slot-6.png',
+};
+
+const SLOT_OBJECT_POSITIONS: Record<number, string> = {
+  1: 'center 20%', // Kaguya
+  2: 'center 15%', // Senku
+  3: 'center 25%', // Miku
+  4: 'center 20%', // Chizuru
+  5: 'center 20%', // Itsuki
+  6: 'center 15%', // Ayame
+};
+
 function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];filled: number;total: number;loading: boolean;}) {
   const leaderSlots = leaders.filter((l) => l.position <= 3);
   const coLeaderSlots = leaders.filter((l) => l.position > 3);
@@ -1462,54 +1480,132 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
                 <Badge className="bg-[color:var(--gold)] text-black">Positions 1-3</Badge>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {leaderSlots.map((l) =>
-              <Card key={l.id} className="overflow-hidden bg-[rgba(255,255,255,0.5)] border-2 border-[color:var(--gold)]/30 backdrop-blur-md hover:border-[color:var(--gold)]/60 transition-colors">
-                    {/* Liquid glass background with circular avatar */}
-                    <div className="h-48 relative flex items-center justify-center overflow-hidden">
-                      {/* Liquid glass effect */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-                        <div className="absolute inset-0" style={{
-                          background: 'radial-gradient(circle at 30% 70%, rgba(167,216,255,0.4) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(215,196,243,0.3) 0%, transparent 50%)',
-                        }} />
-                        <div className="absolute inset-0 backdrop-blur-3xl bg-white/20" />
+                {leaderSlots.map((l) => {
+                  const isFilled = l.status === 'filled';
+                  return (
+                    <Card
+                      key={l.id}
+                      className={`group overflow-hidden backdrop-blur-md transition-all duration-300 hover:shadow-2xl ${
+                        isFilled
+                          ? "bg-white/85 border-2 border-[color:var(--gold)]/60 shadow-lg ring-1 ring-[color:var(--gold)]/20"
+                          : "bg-[rgba(255,255,255,0.5)] border-2 border-[color:var(--gold)]/30 hover:border-[color:var(--gold)]/60"
+                      }`}
+                    >
+                      {/* Visual backdrop header with circular avatar */}
+                      <div className="h-48 relative flex items-center justify-center overflow-hidden bg-slate-900/95">
+                        {isFilled ? (
+                          <>
+                            {/* Approved slot backdrop image */}
+                            <img
+                              src={SLOT_BACKDROPS[l.position] || `/slots/slot-${l.position}.png`}
+                              alt={`Slot #${l.position} Backdrop`}
+                              className="absolute inset-0 h-full w-full object-cover transform transition-transform duration-700 ease-out group-hover:scale-110"
+                              style={{ objectPosition: SLOT_OBJECT_POSITIONS[l.position] || 'center 20%' }}
+                              loading="lazy"
+                              decoding="async"
+                            />
+                            {/* Cinematic multi-gradient vignette for premium contrast */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/45" />
+                            <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
+                            {/* Ambient gold glow behind avatar */}
+                            <div
+                              className="absolute inset-0 pointer-events-none"
+                              style={{
+                                background: 'radial-gradient(circle at center, rgba(255,215,0,0.22) 0%, transparent 60%)',
+                              }}
+                            />
+                          </>
+                        ) : (
+                          /* Open slot liquid glass effect */
+                          <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+                            <div
+                              className="absolute inset-0"
+                              style={{
+                                background:
+                                  'radial-gradient(circle at 30% 70%, rgba(167,216,255,0.4) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(215,196,243,0.3) 0%, transparent 50%)',
+                              }}
+                            />
+                            <div className="absolute inset-0 backdrop-blur-3xl bg-white/20" />
+                          </div>
+                        )}
+
+                        {/* Badge overlay on top-left */}
+                        <div className="absolute top-2.5 left-2.5 z-10">
+                          <Badge
+                            className={`font-semibold tracking-wide ${
+                              isFilled
+                                ? "bg-[color:var(--gold)] text-black shadow-md backdrop-blur-sm border border-amber-200/50"
+                                : "bg-[color:var(--gold)] text-black shadow-sm"
+                            }`}
+                          >
+                            Leader
+                          </Badge>
+                        </div>
+
+                        {/* Position chip on top-right */}
+                        <div className="absolute top-2.5 right-2.5 z-10">
+                          <Badge
+                            variant="outline"
+                            className={`text-2xs font-semibold px-2 py-0.5 rounded-full ${
+                              isFilled
+                                ? "bg-black/55 text-white/95 border-white/30 backdrop-blur-md shadow-sm"
+                                : "bg-white/70 text-gray-700 border-gray-300/70 backdrop-blur-sm shadow-2xs"
+                            }`}
+                          >
+                            Slot #{l.position}
+                          </Badge>
+                        </div>
+
+                        {/* Circular avatar floating above background */}
+                        <div
+                          className={`relative z-10 h-32 w-32 rounded-full overflow-hidden transition-all duration-300 ${
+                            isFilled
+                              ? "border-4 border-white/95 shadow-[0_12px_36px_rgba(0,0,0,0.65)] ring-2 ring-[color:var(--gold)]/80 group-hover:ring-4 group-hover:scale-105"
+                              : "border-4 border-white/60 shadow-2xl backdrop-blur-sm"
+                          }`}
+                        >
+                          <img
+                            src={l.avatar}
+                            alt={l.name ?? `Leader ${l.position}`}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                            width={128}
+                            height={128}
+                          />
+                          {/* Inner glow */}
+                          <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/25" />
+                        </div>
                       </div>
-                      
-                      {/* Badge overlay */}
-                      <div className="absolute top-2 left-2 z-10">
-                        <Badge className="bg-[color:var(--gold)] text-black">Leader</Badge>
-                      </div>
-                      
-                      {/* Circular avatar */}
-                      <div className="relative z-10 h-32 w-32 rounded-full overflow-hidden border-4 border-white/60 shadow-2xl backdrop-blur-sm">
-                        <img 
-                          src={l.avatar} 
-                          alt={l.name ?? `Leader ${l.position}`}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          decoding="async"
-                          width={128}
-                          height={128}
-                        />
-                        {/* Inner glow */}
-                        <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/20" />
-                      </div>
-                    </div>
-                    
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center justify-between">
-                        <span style={{ fontFamily: "Cinzel, serif", color: '#333333' }}>{l.name ?? `Leader Slot #${l.position}`}</span>
-                        <Badge className={l.status === 'filled' ? "bg-[color:var(--gold)] text-black" : "bg-transparent border border-[rgba(0,0,0,0.1)] text-[#555555]"}>
-                          {l.status === 'filled' ? "Filled" : "Open"}
-                        </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <p className="text-sm text-muted-foreground" style={{ color: '#333333' }}>
-                        {l.status === 'filled' ? 'Leading the way forward' : 'Awaiting an inspiring leader'}
-                      </p>
-                    </CardContent>
-                  </Card>
-              )}
+
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center justify-between gap-2">
+                          <span
+                            className="truncate text-base md:text-lg font-bold"
+                            style={{ fontFamily: "Cinzel, serif", color: "#222222" }}
+                            title={l.name ?? `Leader Slot #${l.position}`}
+                          >
+                            {l.name ?? `Leader Slot #${l.position}`}
+                          </span>
+                          <Badge
+                            className={`flex-shrink-0 font-semibold px-2.5 py-0.5 ${
+                              isFilled
+                                ? "bg-[color:var(--gold)] text-black shadow-sm"
+                                : "bg-transparent border border-gray-300 text-[#555555]"
+                            }`}
+                          >
+                            {isFilled ? "Filled" : "Open"}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <p className="text-sm font-medium" style={{ color: isFilled ? "#444444" : "#666666" }}>
+                          {isFilled ? "Leading the way forward" : "Awaiting an inspiring leader"}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
 
@@ -1520,54 +1616,132 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
                 <Badge className="bg-[color:var(--silver)] text-[#333333]">Positions 4-6</Badge>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {coLeaderSlots.map((l) =>
-              <Card key={l.id} className="overflow-hidden bg-[rgba(255,255,255,0.5)] border-2 border-[color:var(--silver)]/30 backdrop-blur-md hover:border-[color:var(--silver)]/60 transition-colors">
-                    {/* Liquid glass background with circular avatar */}
-                    <div className="h-48 relative flex items-center justify-center overflow-hidden">
-                      {/* Liquid glass effect */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
-                        <div className="absolute inset-0" style={{
-                          background: 'radial-gradient(circle at 30% 70%, rgba(215,196,243,0.4) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(185,251,192,0.3) 0%, transparent 50%)',
-                        }} />
-                        <div className="absolute inset-0 backdrop-blur-3xl bg-white/20" />
+                {coLeaderSlots.map((l) => {
+                  const isFilled = l.status === 'filled';
+                  return (
+                    <Card
+                      key={l.id}
+                      className={`group overflow-hidden backdrop-blur-md transition-all duration-300 hover:shadow-2xl ${
+                        isFilled
+                          ? "bg-white/85 border-2 border-[color:var(--silver)]/70 shadow-lg ring-1 ring-slate-300/40"
+                          : "bg-[rgba(255,255,255,0.5)] border-2 border-[color:var(--silver)]/30 hover:border-[color:var(--silver)]/60"
+                      }`}
+                    >
+                      {/* Visual backdrop header with circular avatar */}
+                      <div className="h-48 relative flex items-center justify-center overflow-hidden bg-slate-900/95">
+                        {isFilled ? (
+                          <>
+                            {/* Approved slot backdrop image */}
+                            <img
+                              src={SLOT_BACKDROPS[l.position] || `/slots/slot-${l.position}.png`}
+                              alt={`Slot #${l.position} Backdrop`}
+                              className="absolute inset-0 h-full w-full object-cover transform transition-transform duration-700 ease-out group-hover:scale-110"
+                              style={{ objectPosition: SLOT_OBJECT_POSITIONS[l.position] || 'center 20%' }}
+                              loading="lazy"
+                              decoding="async"
+                            />
+                            {/* Cinematic multi-gradient vignette for premium contrast */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/45" />
+                            <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
+                            {/* Subtle silver/violet glow behind avatar */}
+                            <div
+                              className="absolute inset-0 pointer-events-none"
+                              style={{
+                                background: 'radial-gradient(circle at center, rgba(200,210,240,0.25) 0%, transparent 60%)',
+                              }}
+                            />
+                          </>
+                        ) : (
+                          /* Open slot liquid glass effect */
+                          <div className="absolute inset-0 bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
+                            <div
+                              className="absolute inset-0"
+                              style={{
+                                background:
+                                  'radial-gradient(circle at 30% 70%, rgba(215,196,243,0.4) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(185,251,192,0.3) 0%, transparent 50%)',
+                              }}
+                            />
+                            <div className="absolute inset-0 backdrop-blur-3xl bg-white/20" />
+                          </div>
+                        )}
+
+                        {/* Role badge overlay on top-left */}
+                        <div className="absolute top-2.5 left-2.5 z-10">
+                          <Badge
+                            className={`font-semibold tracking-wide ${
+                              isFilled
+                                ? "bg-[color:var(--silver)] text-[#222222] shadow-md backdrop-blur-sm border border-slate-200/50"
+                                : "bg-[color:var(--silver)] text-[#333333] shadow-sm"
+                            }`}
+                          >
+                            Co-Leader
+                          </Badge>
+                        </div>
+
+                        {/* Slot position chip on top-right */}
+                        <div className="absolute top-2.5 right-2.5 z-10">
+                          <Badge
+                            variant="outline"
+                            className={`text-2xs font-semibold px-2 py-0.5 rounded-full ${
+                              isFilled
+                                ? "bg-black/55 text-white/95 border-white/30 backdrop-blur-md shadow-sm"
+                                : "bg-white/70 text-gray-700 border-gray-300/70 backdrop-blur-sm shadow-2xs"
+                            }`}
+                          >
+                            Slot #{l.position}
+                          </Badge>
+                        </div>
+
+                        {/* Circular avatar floating above background */}
+                        <div
+                          className={`relative z-10 h-32 w-32 rounded-full overflow-hidden transition-all duration-300 ${
+                            isFilled
+                              ? "border-4 border-white/95 shadow-[0_12px_36px_rgba(0,0,0,0.65)] ring-2 ring-[color:var(--silver)]/90 group-hover:ring-4 group-hover:scale-105"
+                              : "border-4 border-white/60 shadow-2xl backdrop-blur-sm"
+                          }`}
+                        >
+                          <img
+                            src={l.avatar}
+                            alt={l.name ?? `Co-Leader ${l.position}`}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                            width={128}
+                            height={128}
+                          />
+                          {/* Inner glow */}
+                          <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/25" />
+                        </div>
                       </div>
-                      
-                      {/* Badge overlay */}
-                      <div className="absolute top-2 left-2 z-10">
-                        <Badge className="bg-[color:var(--silver)] text-[#333333]">Co-Leader</Badge>
-                      </div>
-                      
-                      {/* Circular avatar */}
-                      <div className="relative z-10 h-32 w-32 rounded-full overflow-hidden border-4 border-white/60 shadow-2xl backdrop-blur-sm">
-                        <img 
-                          src={l.avatar} 
-                          alt={l.name ?? `Co-Leader ${l.position}`}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          decoding="async"
-                          width={128}
-                          height={128}
-                        />
-                        {/* Inner glow */}
-                        <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/20" />
-                      </div>
-                    </div>
-                    
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center justify-between">
-                        <span style={{ fontFamily: "Cinzel, serif", color: '#333333' }}>{l.name ?? `Co-Leader Slot #${l.position}`}</span>
-                        <Badge className={l.status === 'filled' ? "bg-[color:var(--gold)] text-black" : "bg-transparent border border-[rgba(0,0,0,0.1)] text-[#555555]"}>
-                          {l.status === 'filled' ? "Filled" : "Open"}
-                        </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <p className="text-sm text-muted-foreground" style={{ color: '#333333' }}>
-                        {l.status === 'filled' ? 'Supporting with excellence' : 'Awaiting a dedicated co-leader'}
-                      </p>
-                    </CardContent>
-                  </Card>
-              )}
+
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center justify-between gap-2">
+                          <span
+                            className="truncate text-base md:text-lg font-bold"
+                            style={{ fontFamily: "Cinzel, serif", color: "#222222" }}
+                            title={l.name ?? `Co-Leader Slot #${l.position}`}
+                          >
+                            {l.name ?? `Co-Leader Slot #${l.position}`}
+                          </span>
+                          <Badge
+                            className={`flex-shrink-0 font-semibold px-2.5 py-0.5 ${
+                              isFilled
+                                ? "bg-[color:var(--gold)] text-black shadow-sm"
+                                : "bg-transparent border border-gray-300 text-[#555555]"
+                            }`}
+                          >
+                            {isFilled ? "Filled" : "Open"}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <p className="text-sm font-medium" style={{ color: isFilled ? "#444444" : "#666666" }}>
+                          {isFilled ? "Supporting with excellence" : "Awaiting a dedicated co-leader"}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
           </div>

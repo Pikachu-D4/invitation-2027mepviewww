@@ -3,7 +3,13 @@ import "./globals.css";
 import ErrorReporter from "@/components/ErrorReporter";
 import { Toaster } from "@/components/ui/sonner";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://mep.eomeg.in";
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : "https://mep-invitation.toxicsmile22936.me");
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -24,8 +30,9 @@ export const metadata: Metadata = {
     images: [
       {
         url: "/og-image.png",
-        width: 1200,
-        height: 630,
+        width: 1024,
+        height: 341,
+        type: "image/png",
         alt: "MEP 2027 – New Year Celebration",
       },
     ],
