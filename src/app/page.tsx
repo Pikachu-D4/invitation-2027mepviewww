@@ -314,6 +314,79 @@ export default function Home() {
     }
   }
 
+  // Functional button handlers: preselect role and navigate smoothly
+  const handleApplyAsLeader = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    setRequestedRole("Leader");
+    setRequestedPosition(0);
+    const el = document.getElementById("apply");
+    if (el) {
+      const navOffset = 80;
+      const elementPosition = el.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - navOffset;
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
+      window.history.pushState(null, "", "#apply");
+    } else {
+      window.location.hash = "apply";
+    }
+  };
+
+  const handleApplyAsCoLeader = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    setRequestedRole("Co-Leader");
+    setRequestedPosition(0);
+    const el = document.getElementById("apply");
+    if (el) {
+      const navOffset = 80;
+      const elementPosition = el.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - navOffset;
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
+      window.history.pushState(null, "", "#apply");
+    } else {
+      window.location.hash = "apply";
+    }
+  };
+
+  const handleLearnMore = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    const el = document.getElementById("about");
+    if (el) {
+      const navOffset = 80;
+      const elementPosition = el.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - navOffset;
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
+      window.history.pushState(null, "", "#about");
+    } else {
+      window.location.hash = "about";
+    }
+  };
+
+  const handleAboutCta = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    const el = document.getElementById("apply");
+    if (el) {
+      const navOffset = 80;
+      const elementPosition = el.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - navOffset;
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth"
+      });
+      window.history.pushState(null, "", "#apply");
+    } else {
+      window.location.hash = "apply";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 text-[#333333] relative">
       {/* Animated backgrounds */}
@@ -336,12 +409,15 @@ export default function Home() {
           celebrate={celebrate}
           hero={content.hero}
           event={content.event}
+          onApplyAsLeader={handleApplyAsLeader}
+          onApplyAsCoLeader={handleApplyAsCoLeader}
+          onLearnMore={handleLearnMore}
         />
       </SectionWithParallax>
 
       <main className="relative z-10">
         <SectionWithParallax>
-          <About about={content.about} />
+          <About about={content.about} onAboutCta={handleAboutCta} />
         </SectionWithParallax>
         <SectionWithParallax>
           <LeadersGrid leaders={leaders} filled={filled} total={total} loading={loading} />
@@ -389,7 +465,7 @@ export default function Home() {
 
       <FloatingParticles />
 
-      <style>{`:root html{scroll-behavior:smooth}`}</style>
+      <style>{`html { scroll-behavior: smooth; }`}</style>
     </div>);
 
 }
@@ -461,9 +537,9 @@ function Navbar({ filled, total }: {filled: number;total: number;}) {
         {/* Desktop Actions */}
         <div className="hidden md:flex items-center gap-3">
           <Badge className="bg-[color:var(--gold)] text-black">{filled}/{total} filled</Badge>
-          <a href="#apply">
-            <Button className="bg-[color:var(--gold)] text-black hover:bg-[color:var(--gold)]/90">Apply</Button>
-          </a>
+          <Button asChild className="bg-[color:var(--gold)] text-black hover:bg-[color:var(--gold)]/90">
+            <a href="#apply" id="nav-apply-btn">Apply</a>
+          </Button>
         </div>
 
         {/* Mobile Menu Button */}
@@ -525,11 +601,11 @@ function Navbar({ filled, total }: {filled: number;total: number;}) {
               
               <div className="pt-3 border-t border-[rgba(0,0,0,0.1)] flex flex-col gap-3">
                 <Badge className="bg-[color:var(--gold)] text-black w-fit">{filled}/{total} filled</Badge>
-                <a href="#apply" onClick={handleLinkClick}>
-                  <Button className="w-full bg-[color:var(--gold)] text-black hover:bg-[color:var(--gold)]/90">
+                <Button asChild className="w-full bg-[color:var(--gold)] text-black hover:bg-[color:var(--gold)]/90">
+                  <a href="#apply" onClick={handleLinkClick} id="mobile-nav-apply-btn">
                     Apply Now
-                  </Button>
-                </a>
+                  </a>
+                </Button>
               </div>
             </div>
           </motion.div>
@@ -579,11 +655,17 @@ function Hero({
   celebrate,
   hero,
   event,
+  onApplyAsLeader,
+  onApplyAsCoLeader,
+  onLearnMore,
 }: {
   timeLeft: { days: number; hours: number; minutes: number; seconds: number };
   celebrate: boolean;
   hero: SiteContent['hero'];
   event: SiteContent['event'];
+  onApplyAsLeader: (e: React.MouseEvent) => void;
+  onApplyAsCoLeader: (e: React.MouseEvent) => void;
+  onLearnMore: (e: React.MouseEvent) => void;
 }) {
   if (!hero || !hero.visible) return null;
 
@@ -595,15 +677,15 @@ function Hero({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, ease: "easeOut" }}
-          className="mx-auto max-w-4xl p-8 md:p-12 rounded-3xl glass-panel bg-[rgba(255,255,255,0.15)] border-[rgba(255,255,255,0.3)] backdrop-blur-3xl shadow-2xl overflow-hidden relative"
+          className="mx-auto max-w-4xl p-8 md:p-12 rounded-3xl glass-panel bg-[rgba(255,255,255,0.15)] border-[rgba(255,255,255,0.3)] backdrop-blur-3xl shadow-2xl overflow-hidden relative z-10"
           style={{
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
           }}>
 
-          <div className="liquid-bg"></div>
+          <div className="liquid-bg pointer-events-none"></div>
           {celebrate && (
             <motion.div
-              className="absolute inset-0 bg-gradient-to-br from-gold/20 via-transparent to-blue-100/20 rounded-3xl blur-3xl opacity-70"
+              className="pointer-events-none absolute inset-0 bg-gradient-to-br from-gold/20 via-transparent to-blue-100/20 rounded-3xl blur-3xl opacity-70"
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1.5, opacity: 0.8 }}
               transition={{ duration: 3, repeat: 1 }}
@@ -633,27 +715,42 @@ function Hero({
               {hero.subtitle}
             </motion.p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10 relative z-20">
               {hero.primaryCtaLabel && (
-                <a href={hero.primaryCtaLink || "#apply"}>
-                  <Button size="lg" className="liquid-button text-black shadow-[0_8px_32px_0_rgba(167,216,255,0.1)] hover:shadow-[0_8px_32px_0_rgba(167,216,255,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(167,216,255,0.6))' }}>
+                <Button
+                  asChild
+                  size="lg"
+                  className="liquid-button text-black shadow-[0_8px_32px_0_rgba(167,216,255,0.1)] hover:shadow-[0_8px_32px_0_rgba(167,216,255,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)] cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(167,216,255,0.6))' }}
+                >
+                  <a href={hero.primaryCtaLink || "#apply"} onClick={onApplyAsLeader} id="hero-apply-leader-btn">
                     {hero.primaryCtaLabel}
-                  </Button>
-                </a>
+                  </a>
+                </Button>
               )}
               {hero.secondaryCtaLabel && (
-                <a href={hero.secondaryCtaLink || "#apply"}>
-                  <Button size="lg" className="liquid-button text-[#333333] shadow-[0_8px_32px_0_rgba(215,196,243,0.1)] hover:shadow-[0_8px_32px_0_rgba(215,196,243,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(215,196,243,0.6))' }}>
+                <Button
+                  asChild
+                  size="lg"
+                  className="liquid-button text-[#333333] shadow-[0_8px_32px_0_rgba(215,196,243,0.1)] hover:shadow-[0_8px_32px_0_rgba(215,196,243,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)] cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(215,196,243,0.6))' }}
+                >
+                  <a href={hero.secondaryCtaLink || "#apply"} onClick={onApplyAsCoLeader} id="hero-apply-coleader-btn">
                     {hero.secondaryCtaLabel}
-                  </Button>
-                </a>
+                  </a>
+                </Button>
               )}
               {hero.learnMoreLabel && (
-                <a href={hero.learnMoreLink || "#about"}>
-                  <Button variant="outline" size="lg" className="glass-button border-[rgba(51,51,51,0.2)] text-[#333333] hover:bg-[rgba(255,255,255,0.5)] hover:shadow-[0_4px_16px_0_rgba(51,51,51,0.1)] backdrop-blur-md">
+                <Button
+                  asChild
+                  variant="outline"
+                  size="lg"
+                  className="glass-button border-[rgba(51,51,51,0.2)] text-[#333333] hover:bg-[rgba(255,255,255,0.5)] hover:shadow-[0_4px_16px_0_rgba(51,51,51,0.1)] backdrop-blur-md cursor-pointer"
+                >
+                  <a href={hero.learnMoreLink || "#about"} onClick={onLearnMore} id="hero-learn-more-btn">
                     {hero.learnMoreLabel}
-                  </Button>
-                </a>
+                  </a>
+                </Button>
               )}
             </div>
 
@@ -718,8 +815,8 @@ function Hero({
         </motion.div>
 
         {/* Background image with overlay for futuristic feel */}
-        <div className="absolute inset-0 -z-10" style={{ backgroundImage: "url(https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1600&auto=format&fit=crop)", backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.1 }} />
-        <div className="absolute inset-0 bg-gradient-to-t from-[rgba(255,255,255,0.1)] via-transparent to-transparent"></div>
+        <div className="pointer-events-none absolute inset-0 -z-10" style={{ backgroundImage: "url(https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1600&auto=format&fit=crop)", backgroundSize: 'cover', backgroundPosition: 'center', opacity: 0.1 }} />
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-t from-[rgba(255,255,255,0.1)] via-transparent to-transparent"></div>
       </div>
     </section>);
 
@@ -1081,11 +1178,11 @@ function SectionWithParallax({ children }: {children: React.ReactNode;}) {
 
 }
 
-function About({ about }: { about: SiteContent['about'] }) {
+function About({ about, onAboutCta }: { about: SiteContent['about']; onAboutCta?: (e: React.MouseEvent) => void; }) {
   if (!about || !about.visible) return null;
 
   return (
-    <section id="about" className="py-16 md:py-24">
+    <section id="about" className="scroll-mt-20 py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4 space-y-8">
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
           <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900" style={{ fontFamily: "Cinzel, serif" }}>
@@ -1134,11 +1231,22 @@ function About({ about }: { about: SiteContent['about'] }) {
               {about.calloutText}
             </p>
             {about.ctaButtonText && (
-              <a href={about.ctaButtonLink || "#apply"}>
-                <Button size="lg" className="liquid-button text-black font-semibold shadow-md" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(167,216,255,0.7))' }}>
-                  {about.ctaButtonText} →
+              <div className="relative z-10 pt-2">
+                <Button
+                  asChild
+                  size="lg"
+                  className="liquid-button text-black font-semibold shadow-md"
+                  style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(167,216,255,0.7))' }}
+                >
+                  <a
+                    href={about.ctaButtonLink || "#apply"}
+                    onClick={onAboutCta}
+                    id="about-cta-btn"
+                  >
+                    {about.ctaButtonText} →
+                  </a>
                 </Button>
-              </a>
+              </div>
             )}
           </div>
         )}
@@ -1152,7 +1260,7 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
   const coLeaderSlots = leaders.filter((l) => l.position > 3);
 
   return (
-    <section id="leaders" className="py-16 md:py-24">
+    <section id="leaders" className="scroll-mt-20 py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4">
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
@@ -1393,7 +1501,7 @@ function ApplicationForm(props: {
   const isSelectedSlotOccupied = selectedLeaderSlot ? selectedLeaderSlot.status === 'filled' : false;
 
   return (
-    <section id="apply" className="py-16 md:py-24">
+    <section id="apply" className="scroll-mt-20 py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
         {/* Left Column: Guidelines & Progress */}
         <div>
@@ -1595,8 +1703,10 @@ function ApplicationForm(props: {
                     <div
                       role="button"
                       tabIndex={0}
+                      aria-pressed={requestedRole === "Leader"}
+                      aria-label="Select Squad Leader role"
                       onClick={() => onRequestedRole("Leader")}
-                      onKeyDown={(e) => e.key === 'Enter' && onRequestedRole("Leader")}
+                      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onRequestedRole("Leader")}
                       className={`cursor-pointer p-4 rounded-xl border-2 transition-all duration-200 text-left ${
                         requestedRole === "Leader"
                           ? "border-amber-500 bg-amber-50/80 shadow-md ring-2 ring-amber-200"
@@ -1621,8 +1731,10 @@ function ApplicationForm(props: {
                     <div
                       role="button"
                       tabIndex={0}
+                      aria-pressed={requestedRole === "Co-Leader"}
+                      aria-label="Select Squad Co-Leader role"
                       onClick={() => onRequestedRole("Co-Leader")}
-                      onKeyDown={(e) => e.key === 'Enter' && onRequestedRole("Co-Leader")}
+                      onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onRequestedRole("Co-Leader")}
                       className={`cursor-pointer p-4 rounded-xl border-2 transition-all duration-200 text-left ${
                         requestedRole === "Co-Leader"
                           ? "border-indigo-500 bg-indigo-50/80 shadow-md ring-2 ring-indigo-200"
@@ -1802,7 +1914,7 @@ function FAQ({ faqs }: { faqs: SiteContent['faqs'] }) {
   if (!faqs || faqs.length === 0) return null;
 
   return (
-    <section id="faq" className="py-16 md:py-24">
+    <section id="faq" className="scroll-mt-20 py-16 md:py-24">
       <div className="mx-auto max-w-4xl px-4">
         <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "Cinzel, serif", color: '#333333' }}>
           Frequently Asked Questions
@@ -1828,7 +1940,7 @@ function Contact({ contact }: { contact: SiteContent['contact'] }) {
   if (!contact) return null;
 
   return (
-    <section id="contact" className="py-16 md:py-24">
+    <section id="contact" className="scroll-mt-20 py-16 md:py-24">
       <div className="mx-auto max-w-4xl px-4 text-center">
         <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "Cinzel, serif", color: '#333333' }}>
           {contact.heading || "Contact"}

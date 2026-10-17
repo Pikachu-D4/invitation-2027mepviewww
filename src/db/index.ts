@@ -200,6 +200,55 @@ export async function ensureDbInitialized(): Promise<void> {
           sql: 'INSERT INTO content_revisions (content_id, data, action, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
           args: ['main', jsonPayload, 'initial', 'system_initial', now],
         });
+      } else {
+        // Safe, idempotent update: If the stored content still has the legacy uncustomized About copy,
+        // update only the uncustomized About section fields to the new natural copy,
+        // while preserving all customized administrator edits in other sections.
+        try {
+          const rowRes = await client.execute({
+            sql: 'SELECT data, version FROM site_content WHERE id = ?',
+            args: ['main'],
+          });
+          const row = rowRes.rows[0];
+          if (row && typeof row.data === 'string') {
+            const parsed = JSON.parse(row.data);
+            const isLegacyAbout =
+              parsed.about &&
+              (parsed.about.heading === 'About MEP' ||
+                parsed.about.ctaButtonText === 'Fill out the Application Form below' ||
+                (typeof parsed.about.introParagraph === 'string' &&
+                  parsed.about.introParagraph.includes("We're kicking off the 2027 New Year")));
+
+            if (isLegacyAbout) {
+              parsed.about = {
+                ...parsed.about,
+                heading: DEFAULT_SITE_CONTENT.about.heading,
+                subtitle: DEFAULT_SITE_CONTENT.about.subtitle,
+                introParagraph: DEFAULT_SITE_CONTENT.about.introParagraph,
+                additionalParagraphs: DEFAULT_SITE_CONTENT.about.additionalParagraphs,
+                calloutText: DEFAULT_SITE_CONTENT.about.calloutText,
+                ctaButtonText: DEFAULT_SITE_CONTENT.about.ctaButtonText,
+                ctaButtonLink: DEFAULT_SITE_CONTENT.about.ctaButtonLink,
+              };
+
+              const now = Date.now();
+              const nextVersion = (Number(row.version) || 1) + 1;
+              const updatedJson = JSON.stringify(parsed);
+
+              await client.execute({
+                sql: 'UPDATE site_content SET data = ?, version = ?, updated_by = ?, updated_at = ? WHERE id = ?',
+                args: [updatedJson, nextVersion, 'system_about_copy_update', now, 'main'],
+              });
+
+              await client.execute({
+                sql: 'INSERT INTO content_revisions (content_id, data, action, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
+                args: ['main', updatedJson, 'update', 'system_about_copy_update', now],
+              });
+            }
+          }
+        } catch (migrationErr) {
+          console.warn('Idempotent site_content About copy update skipped or failed gracefully:', migrationErr);
+        }
       }
     } catch (err) {
       console.error('Failed to initialize database schema:', err);

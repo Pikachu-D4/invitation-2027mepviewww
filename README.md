@@ -1,147 +1,280 @@
-# MEP 2027 Leader Invitation & Application System
+# MEP 2027 — Leadership Application Platform & CMS
 
-A production-ready Next.js application for the **MEP 2027 New Year Celebration** leader and co-leader invitation, application workflow, and administration dashboard.
-
----
-
-## 🌟 Overview
-
-The MEP (Multi-Editor Project) 2027 platform unites 30 creators and editors organized into squads to create a collaborative New Year celebration project. The website features:
-- **Liquid-Glass Modern UI**: Ambient animated backgrounds, glassmorphism panels, countdown timer to January 1, 2027 (Asia/Kolkata timezone: `2027-01-01T00:00:00+05:30`).
-- **Dynamic Website Content Manager & Admin CMS (`/admin`)**:
-  - Fully editable **About MEP** section: headings, subheadings, editable reorderable paragraphs, project info cards, and callout blocks (with squad composition and responsibilities cards removed for a cleaner manifesto flow).
-  - **Hero & Headline**: Main hero title, subtitle, introduction, CTA destinations, and visibility toggle.
-  - **Event & Countdown**: Configurable target date, timezone, countdown description, and visibility.
-  - **Announcement Banner**: Dynamic announcement banner with start/end scheduling and safe color presets (Gold, Cyan, Purple, Emerald).
-  - **FAQs Manager**: Add, edit, delete, and reorder accordion FAQ items with instant mobile & desktop preview.
-  - **Contact & Social Destinations**: Safe HTTPS, WhatsApp, and mailto destination links.
-  - **Live Preview Modal**: Test edits on simulated Desktop (1024px) and Mobile (375px) viewports before saving.
-  - **Revision History & Non-Destructive Reset**: Content change logs with version tracking and safe reset-to-default that never touches applicant records or leader slots.
-- **6 Dedicated Leadership Positions**:
-  - Positions 1–3: Squad Leaders
-  - Positions 4–6: Squad Co-Leaders
-- **Instant Image Compression**: In-browser client-side canvas compression converts mobile photos from 3–5 MB to ~40 KB for fast uploads and instant rendering across devices.
-- **Race-Condition Safe Slot Allocation**: Atomic database slot reservation prevents duplicate allocations during concurrent submissions.
-- **Secured Admin Dashboard (`/admin`)**: Protected management portal for reviewing applicants, zoomable photo preview, status transitions (Pending, Approved, Rejected), slot resets, and CSV export.
+A full-stack Next.js web application built for the **MEP 2027 Multi-Editor Project**. The platform handles public project invitations, leadership application intake with position preferences, applicant asset validation, an administrative moderation system, and a database-backed CMS for dynamic site updates.
 
 ---
 
-## 🛠️ Tech Stack
+## Architecture & System Overview
 
-- **Framework**: Next.js 15.5.28 (App Router, Server Components & Dynamic Route Handlers)
-- **Frontend**: React 19, Tailwind CSS v4, Framer Motion
-- **Database**: Turso (libSQL SQLite engine) + Drizzle ORM 0.44.x
-- **Icons & UI**: Lucide React, Sonner Toaster
-- **Package Manager**: npm (reproducible builds via `package-lock.json`)
+```
+                      ┌──────────────────────────────────────────┐
+                      │             Public Homepage              │
+                      │  - Interactive Invitation UI             │
+                      │  - Countdown Timer (1 Jan 2027)          │
+                      │  - Live Squad Slot Tracker               │
+                      │  - Leadership Application Form           │
+                      └────────────────────┬─────────────────────┘
+                                           │
+                        POST /api/applications (multipart/form-data)
+                        GET  /api/leaders
+                        GET  /api/content
+                                           │
+                                           ▼
+                      ┌──────────────────────────────────────────┐
+                      │            API Route Handlers            │
+                      │  - Input sanitization & Zod/Regex guards │
+                      │  - Image type & size constraints (5MB)   │
+                      │  - Constant-time admin auth (HMAC-SHA256)│
+                      │  - IP rate-limiting on login             │
+                      └────────────────────┬─────────────────────┘
+                                           │
+                         Drizzle ORM + Turso / libSQL (SQLite)
+                                           │
+                                           ▼
+                      ┌──────────────────────────────────────────┐
+                      │              Database Layer              │
+                      │  - `leaders`: Public slots (1-6)         │
+                      │  - `applications`: Pending candidate data│
+                      │  - `site_content`: Dynamic CMS state     │
+                      │  - `content_revisions`: Audit history    │
+                      └──────────────────────────────────────────┘
+```
+
+### Core Workflows
+
+1. **Decoupled Application & Slot Assignment**:
+   - Applicants choose their preferred role (**Squad Leader** for positions 1–3, or **Squad Co-Leader** for positions 4–6) and can specify an exact position or opt for **Flexible** placement (position `0`).
+   - Submissions do **not** immediately occupy public slots. Applications are queued with status `pending` to ensure fair review and prevent front-running.
+   - Administrators review candidates in the `/admin` portal and explicitly confirm slot assignments.
+
+2. **Dynamic CMS & Safe Content Versioning**:
+   - Public page content (Hero, About MEP, Event Details, Announcement Banner, FAQs, Contact) is served via `/api/content` from the `site_content` table.
+   - Content updates made in `/admin` increment the document version and persist an immutable snapshot to `content_revisions`.
+   - CMS resets or updates are strictly isolated; they modify text keys without touching application records, slot assignments, or administrator credentials.
+
+3. **In-Browser Image Optimization & Strict Validation**:
+   - The application form accepts standard image types (`image/jpeg`, `image/png`, `image/webp`).
+   - Client-side canvas compression downscales heavy mobile camera uploads prior to submission.
+   - The API enforces a strict 5 MB payload ceiling, MIME-type verification, and base64 storage.
 
 ---
 
-## 🚀 Quickstart & Local Setup
+## Project Specifications
 
-### 1. Prerequisites
+| Detail | Specification |
+|---|---|
+| **Release Date** | 1 January 2027 (00:00:00 HST / Hawaii Standard Time) |
+| **Member Submission Cutoff** | 15 December 2026 |
+| **Squad Merge Cutoff** | 20 December 2026 |
+| **Project Structure** | 30 Total Editors across 3 Squads |
+| **Squad Leadership** | 3 Squad Leaders (Positions 1–3) + 3 Squad Co-Leaders (Positions 4–6) |
+| **Video Format** | 1080p, 23.976 / 30 FPS, stereo audio |
+
+---
+
+## Tech Stack
+
+- **Framework**: [Next.js 15](https://nextjs.org/) (App Router, Server Components, Route Handlers)
+- **UI & Styling**: [React 19](https://react.dev/), [Tailwind CSS v4](https://tailwindcss.com/), [Framer Motion](https://www.framer.com/motion/)
+- **Primitives & Feedback**: [Radix UI](https://www.radix-ui.com/), [Lucide React](https://lucide.dev/), [Sonner Toaster](https://sonner.emilkowal.ski/)
+- **Database**: [Turso](https://turso.tech/) (libSQL SQLite engine) + [Drizzle ORM](https://orm.drizzle.team/)
+- **Runtime & Tooling**: Node.js 20+, TypeScript 5+, Turbopack
+
+---
+
+## Directory Structure
+
+```
+.
+├── src/
+│   ├── app/
+│   │   ├── admin/                 # Admin authentication and dashboard pages
+│   │   ├── api/
+│   │   │   ├── admin/
+│   │   │   │   ├── content/       # CMS configuration and rollback endpoints
+│   │   │   │   ├── login/         # Constant-time auth with rate limiting
+│   │   │   │   └── logout/        # Session invalidation
+│   │   │   ├── applications/      # Public submission and admin application queries
+│   │   │   │   └── [id]/          # Status changes, assignment, and deletion
+│   │   │   ├── content/           # Public read endpoint for site content
+│   │   │   └── leaders/           # Public slot availability queries
+│   │   ├── globals.css            # Design tokens, custom animations, layer overrides
+│   │   ├── layout.tsx             # Root layout, metadata, and error boundary
+│   │   └── page.tsx               # Main landing page with all interactive sections
+│   ├── components/
+│   │   ├── admin/                 # ContentManager, ApplicationsTable, SlotAssigner
+│   │   └── ui/                    # Reusable Radix UI components (Button, Dialog, etc.)
+│   ├── db/
+│   │   ├── index.ts               # Database connection factory & idempotent migrations
+│   │   └── schema.ts              # Drizzle table schemas (leaders, applications, etc.)
+│   └── lib/
+│       ├── admin-auth.ts          # Session tokens, timingSafeEqual, HMAC validation
+│       ├── content.ts             # Default site content fallback object and types
+│       ├── store.ts               # In-memory development fallback store
+│       └── utils.ts               # Tailwind class merge utilities
+├── public/                        # Static assets and icons
+├── drizzle.config.ts              # Drizzle ORM configuration
+├── next.config.ts                 # Next.js build configuration
+├── package.json                   # Dependencies and scripts
+└── tsconfig.json                  # Strict TypeScript configuration
+```
+
+---
+
+## Database Schema Design
+
+The schema is defined using Drizzle ORM in [`src/db/schema.ts`](file:///c:/Users/pikac/OneDrive/Documents/GitHub/invitation%202027mepviewww/src/db/schema.ts):
+
+### `leaders` Table
+Stores the 6 designated leadership seats displayed on the public site:
+- `id` (integer, primary key)
+- `position` (integer, 1–6): Positions 1–3 = Leader, 4–6 = Co-Leader
+- `role` (text): `'Leader'` or `'Co-Leader'`
+- `status` (text): `'open'` or `'filled'`
+- `name`, `email`, `whatsapp`, `instagramUsername`, `bio`, `profileImage` (text, nullable)
+- `assignedAt` (integer, timestamp)
+
+### `applications` Table
+Stores all incoming candidate submissions:
+- `id` (integer, primary key, auto-increment)
+- `name` (text, min 2 chars)
+- `email` (text, validated email)
+- `whatsapp` (text, international format)
+- `instagramUsername` (text, optional sanitized handle without `@`)
+- `requestedRole` (text): `'Leader'` or `'Co-Leader'`
+- `requestedPosition` (integer): `0` = Flexible, `1–3` = Leader positions, `4–6` = Co-Leader positions
+- `bio` (text, optional)
+- `profileImage` (text, data URL)
+- `status` (text): `'pending'`, `'approved'`, or `'rejected'`
+- `leaderId` (integer, nullable foreign reference to `leaders.id`)
+- `createdAt`, `updatedAt` (integer timestamps)
+
+### `site_content` & `content_revisions` Tables
+Manages persistent homepage content and revision tracking:
+- `id` (text, primary key, e.g. `'main'`)
+- `data` (text, serialized JSON matching `SiteContent` interface)
+- `version` (integer, incremented on every save)
+- `updatedBy`, `updatedAt` (metadata)
+
+---
+
+## Getting Started
+
+### Prerequisites
 - Node.js 20.x or later
 - npm 10.x or later
 
-### 2. Installation
+### 1. Installation
+Clone the repository and install dependencies:
 ```bash
+git clone https://github.com/Pikachu-D4/invitation-2027mepviewww.git
+cd invitation-2027mepviewww
 npm install
 ```
 
-### 3. Environment Variables
-Copy `.env.example` to `.env.local`:
+### 2. Environment Configuration
+Copy the template environment file:
 ```bash
 cp .env.example .env.local
 ```
 
-Configure your variables in `.env.local`:
+Populate the required keys in `.env.local`:
 ```env
-# Turso / libSQL (Persistent Cloud Database)
-TURSO_CONNECTION_URL=libsql://your-db.turso.io
+# Database (Turso / libSQL)
+TURSO_CONNECTION_URL=libsql://your-database.turso.io
 TURSO_AUTH_TOKEN=your-turso-auth-token
 
-# Admin Dashboard Authentication (Required in Production)
-ADMIN_PASSWORD=your-strong-production-admin-password
-ADMIN_SECRET=your-random-32-plus-character-secret-key-for-session-signing
+# Admin Security (Required for production environments)
+ADMIN_PASSWORD=your-secure-admin-password
+ADMIN_SECRET=your-32-plus-char-random-signing-secret
 
-# Site Canonical URL
+# Public Canonical URL
 NEXT_PUBLIC_SITE_URL=https://mep.eomeg.in
 ```
 
-### 4. Run Development Server
+> **Note for Local Development**: If `TURSO_CONNECTION_URL` is omitted, the application automatically boots using an in-memory dev store (`src/lib/store.ts`). This allows frontend and workflow testing without setting up external cloud infrastructure.
+
+### 3. Running Locally
+Start the development server with Turbopack:
 ```bash
 npm run dev
 ```
-Open `http://localhost:3000` in your browser. The admin portal is accessible at `http://localhost:3000/admin`.
+Navigate to `http://localhost:3000` to view the homepage. Access the management portal at `http://localhost:3000/admin`.
 
 ---
 
-## 🧪 Testing & Verification Commands
+## Verification & Build Commands
+
+Before pushing code or deploying to production, run the project checks:
 
 ```bash
-# Type check with TypeScript compiler
+# 1. Type verification
 npx tsc --noEmit
 
-# Production build check
+# 2. Lint check
+npm run lint
+
+# 3. Production bundle compilation
 npm run build
 
-# Start production server locally
+# 4. Run production build locally
 npm run start
 ```
 
 ---
 
-## 🔒 Security Architecture
+## Security Model
 
-1. **Strict Production Credential Enforcement**:
-   - In production (`NODE_ENV === 'production'`), strong `ADMIN_PASSWORD` and `ADMIN_SECRET` are mandatory. The system refuses to fall back to insecure default passwords in production.
+1. **Authentication & Session Tokens**:
+   - Admin sessions utilize HMAC-SHA256 signed session tokens issued inside `HttpOnly`, `SameSite=Strict`, and `Secure` cookies.
+   - Password comparisons use `crypto.timingSafeEqual` to protect against timing analysis attacks.
 2. **Brute-Force Rate Limiting**:
-   - Login endpoint (`/api/admin/login`) tracks IP-based login attempts and temporarily throttles after 5 failed attempts within 15 minutes.
-3. **Constant-Time Verification**:
-   - Passwords are validated using `crypto.timingSafeEqual` to eliminate timing attack vectors.
-4. **Encrypted Session Cookies**:
-   - Admin sessions use HMAC-SHA256 tokens issued with `HttpOnly`, `SameSite=Strict`, and `Secure` attributes in production.
-5. **Private Applicant Data**:
-   - The `/api/applications` GET endpoint and `/api/applications/[id]` routes strictly require an authenticated administrator session. Public clients never have access to phone numbers, emails, or notes.
-6. **Credential Rotation**:
-   - Any historical demo passwords (such as `2554`) or test secrets must be rotated prior to public release.
+   - The `/api/admin/login` endpoint tracks client IP addresses and enforces an automatic lockout period after repeated failed attempts.
+3. **Data Isolation**:
+   - Applicant contact details (emails, phone numbers, bios) are strictly protected. `/api/applications` rejects any request lacking a valid administrator session.
+4. **Input Sanitization**:
+   - Role/position alignment is strictly validated server-side. Applications with invalid mappings (e.g., requesting a Leader role for position 5) are rejected with HTTP 400.
+   - Instagram handles are sanitized to strip leading `@` symbols and validate allowed character sets.
 
 ---
 
-## 🗄️ Database & Concurrency Handling
+## API Reference
 
-- **Lazy Initialization**: Database connections are lazily evaluated via `getClient()` and `getDb()` in `src/db/index.ts`. This guarantees that Next.js static analysis and build phases do not fail when cloud database credentials are not present during bundling.
-- **Dedicated Content Storage**: `site_content` stores published JSON configuration under key `'main'` with automatic version tracking. `content_revisions` retains timestamped snapshots of all administrative updates.
-- **Atomic Slot Assignment**: Leader slots are reserved via atomic `UPDATE leaders ... WHERE id = (SELECT id FROM leaders WHERE status = 'open' ORDER BY position ASC LIMIT 1) RETURNING *;`. This prevents concurrent applicant submissions from being assigned the same position.
-- **Rollback Protection**: If an application database insert fails after reserving a slot, the system automatically rolls back the claimed slot to `open`.
-- **Automatic Schema Migration**: `ensureDbInitialized()` verifies and creates required tables (`leaders`, `applications`, `site_content`, `content_revisions`) and seeds initial default content if absent without overwriting existing administrator content.
-
----
-
-## 📡 API Endpoints Summary
-
-| Endpoint | Method | Auth | Description |
+### Public Endpoints
+| Endpoint | Method | Payload / Params | Description |
 |---|---|---|---|
-| `/api/content` | `GET` | Public | Returns published website content with expired announcements filtered out. |
-| `/api/admin/content` | `GET` | Admin Session | Returns current editable content configuration, version metadata, and revision logs. |
-| `/api/admin/content` | `PATCH` | Admin Session | Validates, saves new site content, increments version, and creates a revision snapshot. |
-| `/api/admin/content/reset` | `POST` | Admin Session | Safely resets website content back to default without modifying applications or leader slots. |
-| `/api/leaders` | `GET` | Public | Returns current leader slots and assignment status. |
-| `/api/applications` | `POST` | Public | Submits new applicant with canvas-compressed photo and atomic slot assignment. |
-| `/api/applications` | `GET` | Admin Session | Lists all applications with filtering and search. |
-| `/api/applications/[id]` | `PATCH` / `DELETE` | Admin Session | Admin status change, leader reassignment, or deletion with linked slot recovery. |
-| `/api/admin/login` | `POST` | Public (Rate-limited) | Verifies admin credentials and sets secure session cookie. |
-| `/api/admin/logout` | `POST` | Public | Clears admin session cookie. |
+| `/api/content` | `GET` | — | Returns active website content JSON. Expired announcements are automatically filtered. |
+| `/api/leaders` | `GET` | — | Returns public leadership slot status (positions 1–6). |
+| `/api/applications` | `POST` | `multipart/form-data` | Submits candidate application with profile image, role preference, and contact information. |
+
+### Admin Endpoints (Session Required)
+| Endpoint | Method | Payload / Params | Description |
+|---|---|---|---|
+| `/api/admin/login` | `POST` | `{ password }` | Authenticates administrator and sets session cookie. |
+| `/api/admin/logout` | `POST` | — | Clears administrator session cookie. |
+| `/api/admin/content` | `GET` | — | Fetches editable site content JSON along with revision history. |
+| `/api/admin/content` | `PATCH` | `{ content }` | Validates, persists site content changes, increments version, and logs a revision. |
+| `/api/admin/content/reset` | `POST` | — | Reverts CMS content to default settings without altering applicants or slots. |
+| `/api/applications` | `GET` | `?status=&role=&search=` | Lists submitted applications with pagination and filters. |
+| `/api/applications/[id]` | `PATCH` | `{ status, leaderId }` | Updates application status or assigns candidate to a specific leader slot. |
+| `/api/applications/[id]` | `DELETE` | — | Removes application and frees any assigned leader slot. |
 
 ---
 
-## ☁️ Deployment to Vercel
+## Deployment (Vercel)
 
 1. Push your repository to GitHub.
-2. Import the project into your Vercel Dashboard.
-3. Set the following Environment Variables in **Project Settings → Environment Variables**:
+2. Connect the repository in the **Vercel Dashboard**.
+3. Add the following **Environment Variables** under Project Settings:
    - `TURSO_CONNECTION_URL`
    - `TURSO_AUTH_TOKEN`
    - `ADMIN_PASSWORD`
    - `ADMIN_SECRET`
    - `NEXT_PUBLIC_SITE_URL`
-4. Deploy. Vercel automatically runs `npm install` and `npm run build`.
+4. Deploy. Next.js handles static pre-rendering and dynamic route compilation automatically.
+
+---
+
+## License
+
+This project is maintained for the MEP 2027 collaboration. Distributed under the [MIT License](LICENSE).

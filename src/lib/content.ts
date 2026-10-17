@@ -114,13 +114,13 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
   },
   about: {
     visible: true,
-    heading: "About MEP",
-    subtitle: "🎬 2027 Mega AMV New Year MEP: Call for Leaders & Co-Leaders! 🎬",
-    introParagraph: "We're kicking off the 2027 New Year with a MEP (Multi Editor Project) and we want you to be part of it!",
+    heading: "About the MEP",
+    subtitle: "Thirty editors. Three squads. One shared New Year release.",
+    introParagraph:
+      "MEP stands for Multi-Editor Project. For the New Year 2027 edition, 30 editors will contribute separate parts to one shared AMV. The work is organised into three squads, allowing each editor to contribute their own style while helping the finished video feel connected from beginning to end.",
     additionalParagraphs: [
-      "This ambitious project will unite 30 driven editors, working together in squads to create something unforgettable.",
-      "That's 3 squads in total — all collaborating, creating, and pushing boundaries!",
-      "🔥 We're currently looking for LEADERS & CO-LEADERS to take charge of our editing squads.",
+      "Each squad has a Leader and a Co-Leader. Leaders coordinate assignments, track progress and collect the finished parts for the final merge. Co-Leaders help with communication, follow up on tasks and support editors when plans need adjusting. Both roles involve working with people, keeping the team organised and helping the squad meet its deadlines.",
+      "Applications are open for three Leader positions (1–3) and three Co-Leader positions (4–6). Applicants can select a preferred role and position on the form. Their selection is a preference, not a confirmed assignment; the final allocation is made after the application is reviewed by an administrator.",
     ],
     totalParticipants: 30,
     squadCount: 3,
@@ -140,8 +140,9 @@ export const DEFAULT_SITE_CONTENT: SiteContent = {
       "Monitor daily progress and assist with feedback and pacing adjustments",
       "Help prepare backup editors and oversee project delivery standards",
     ],
-    calloutText: "If you're passionate about editing, experienced in leadership, and ready to kick off 2027 with creativity and teamwork...",
-    ctaButtonText: "Fill out the Application Form below",
+    calloutText:
+      "If you communicate clearly, organise work reliably and enjoy helping other editors, consider applying. Tell us briefly about your experience and what you would bring to the team.",
+    ctaButtonText: "Apply for a leadership role",
     ctaButtonLink: "#apply",
     infoCards: [
       {
