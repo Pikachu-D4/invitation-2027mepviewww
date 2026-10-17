@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import ErrorReporter from "@/components/ErrorReporter";
 import { Toaster } from "@/components/ui/sonner";
+import { Analytics } from "@vercel/analytics/next";
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://mep.eomeg.in";
 
@@ -60,6 +61,7 @@ export default function RootLayout({
         <ErrorReporter />
         {children}
         <Toaster />
+        <Analytics />
       </body>
     </html>
   );
