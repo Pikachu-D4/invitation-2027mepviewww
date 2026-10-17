@@ -8,9 +8,9 @@ import { memoryStore } from '@/lib/store';
 export const dynamic = 'force-dynamic';
 
 const CACHE_HEADERS = {
-  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-  'CDN-Cache-Control': 'no-store',
-  'Vercel-CDN-Cache-Control': 'no-store',
+  'Cache-Control': 'public, max-age=5, s-maxage=10, stale-while-revalidate=59',
+  'CDN-Cache-Control': 'public, s-maxage=10, stale-while-revalidate=59',
+  'Vercel-CDN-Cache-Control': 'public, s-maxage=10, stale-while-revalidate=59',
 };
 
 export async function GET() {

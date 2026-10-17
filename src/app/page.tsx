@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef, useCallback } from "react";
+import React from "react";
 import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,18 +54,12 @@ export default function Home() {
     requestedPosition: number;
     status: string;
   } | null>(null);
-  // New: profile image state
+  // Profile image state
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
   const [content, setContent] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
-
-  const [timeLeft, setTimeLeft] = useState(getTimeLeft());
-  useEffect(() => {
-    const id = setInterval(() => setTimeLeft(getTimeLeft()), 1000);
-    return () => clearInterval(id);
-  }, [content.event.targetDate]);
 
   // Fetch leaders & site content from database / store
   useEffect(() => {
@@ -74,9 +69,7 @@ export default function Home() {
 
   async function fetchContent() {
     try {
-      const response = await fetch(`/api/content?t=${Date.now()}`, {
-        cache: 'no-store',
-      });
+      const response = await fetch('/api/content');
       if (response.ok) {
         const data = await response.json();
         if (data && typeof data === 'object') {
@@ -90,9 +83,7 @@ export default function Home() {
 
   async function fetchLeaders() {
     try {
-      const response = await fetch(`/api/leaders?t=${Date.now()}`, {
-        cache: 'no-store',
-      });
+      const response = await fetch('/api/leaders');
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -104,27 +95,12 @@ export default function Home() {
     }
   }
 
-  // New: Celebration state
+  // Celebration state (initial 6s celebration)
   const [celebrate, setCelebrate] = useState(true);
   useEffect(() => {
     const timer = setTimeout(() => setCelebrate(false), 6000);
     return () => clearTimeout(timer);
   }, []);
-
-  function getTimeLeft() {
-    const rawTarget = content?.event?.targetDate || "2027-01-01T00:00:00+05:30";
-    const target = new Date(rawTarget);
-    const validTarget = isNaN(target.getTime()) ? TARGET_DATE : target;
-    const now = new Date();
-    const diff = validTarget.getTime() - now.getTime();
-    const clamped = Math.max(0, diff);
-    const s = Math.floor(clamped / 1000);
-    const days = Math.floor(s / 86400);
-    const hours = Math.floor(s % 86400 / 3600);
-    const minutes = Math.floor(s % 3600 / 60);
-    const seconds = s % 60;
-    return { days, hours, minutes, seconds };
-  }
 
   // Compress and resize image to ~40KB so upload & display is ultra fast on all devices
   async function compressImage(file: File): Promise<File> {
@@ -315,7 +291,7 @@ export default function Home() {
   }
 
   // Functional button handlers: preselect role and navigate smoothly
-  const handleApplyAsLeader = (e?: React.MouseEvent) => {
+  const handleApplyAsLeader = useCallback((e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     setRequestedRole("Leader");
     setRequestedPosition(0);
@@ -332,9 +308,9 @@ export default function Home() {
     } else {
       window.location.hash = "apply";
     }
-  };
+  }, []);
 
-  const handleApplyAsCoLeader = (e?: React.MouseEvent) => {
+  const handleApplyAsCoLeader = useCallback((e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     setRequestedRole("Co-Leader");
     setRequestedPosition(0);
@@ -351,9 +327,9 @@ export default function Home() {
     } else {
       window.location.hash = "apply";
     }
-  };
+  }, []);
 
-  const handleLearnMore = (e?: React.MouseEvent) => {
+  const handleLearnMore = useCallback((e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     const el = document.getElementById("about");
     if (el) {
@@ -368,9 +344,9 @@ export default function Home() {
     } else {
       window.location.hash = "about";
     }
-  };
+  }, []);
 
-  const handleAboutCta = (e?: React.MouseEvent) => {
+  const handleAboutCta = useCallback((e?: React.MouseEvent) => {
     if (e) e.preventDefault();
     const el = document.getElementById("apply");
     if (el) {
@@ -385,7 +361,7 @@ export default function Home() {
     } else {
       window.location.hash = "apply";
     }
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 text-[#333333] relative">
@@ -395,17 +371,16 @@ export default function Home() {
       <GoldenSparkles celebrate={celebrate} />
       <SparkleCursor />
       {/* Soft pastel glow background with slight parallax */}
-      <ParallaxBackground />
+      <MemoizedParallaxBackground />
 
       {content.announcement && content.announcement.enabled && (
         <AnnouncementBanner announcement={content.announcement} />
       )}
 
-      <Navbar filled={filled} total={total} />
+      <MemoizedNavbar filled={filled} total={total} />
 
       <SectionWithParallax>
         <Hero
-          timeLeft={timeLeft}
           celebrate={celebrate}
           hero={content.hero}
           event={content.event}
@@ -417,10 +392,10 @@ export default function Home() {
 
       <main className="relative z-10">
         <SectionWithParallax>
-          <About about={content.about} onAboutCta={handleAboutCta} />
+          <MemoizedAbout about={content.about} onAboutCta={handleAboutCta} />
         </SectionWithParallax>
         <SectionWithParallax>
-          <LeadersGrid leaders={leaders} filled={filled} total={total} loading={loading} />
+          <MemoizedLeadersGrid leaders={leaders} filled={filled} total={total} loading={loading} />
         </SectionWithParallax>
         <SectionWithParallax>
           <ApplicationForm
@@ -451,19 +426,18 @@ export default function Home() {
             imageError={imageError}
             onImageChange={handleImageChange}
           />
-
         </SectionWithParallax>
         <SectionWithParallax>
-          <FAQ faqs={content.faqs} />
+          <MemoizedFAQ faqs={content.faqs} />
         </SectionWithParallax>
         <SectionWithParallax>
-          <Contact contact={content.contact} />
+          <MemoizedContact contact={content.contact} />
         </SectionWithParallax>
       </main>
 
-      <Footer />
+      <MemoizedFooter />
 
-      <FloatingParticles />
+      <MemoizedFloatingParticles />
 
       <style>{`html { scroll-behavior: smooth; }`}</style>
     </div>);
@@ -650,8 +624,101 @@ function AnnouncementBanner({ announcement }: { announcement: SiteContent['annou
   );
 }
 
-function Hero({
-  timeLeft,
+function calculateTimeLeft(rawTarget?: string) {
+  const targetDate = rawTarget ? new Date(rawTarget) : TARGET_DATE;
+  const validTarget = isNaN(targetDate.getTime()) ? TARGET_DATE : targetDate;
+  const now = new Date();
+  const diff = validTarget.getTime() - now.getTime();
+  const clamped = Math.max(0, diff);
+  const s = Math.floor(clamped / 1000);
+  const days = Math.floor(s / 86400);
+  const hours = Math.floor((s % 86400) / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  const seconds = s % 60;
+  return { days, hours, minutes, seconds };
+}
+
+function CountdownTimer({
+  targetDateString,
+  heading,
+}: {
+  targetDateString?: string;
+  heading?: string;
+}) {
+  const [timeLeft, setTimeLeft] = useState(() => calculateTimeLeft(targetDateString));
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTimeLeft(calculateTimeLeft(targetDateString));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [targetDateString]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.8 }}
+      className="max-w-xl mx-auto"
+    >
+      <motion.div
+        className="text-center mb-4 sm:mb-6"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+      >
+        <span
+          className="text-lg sm:text-xl md:text-2xl text-[#333333] glass-text-charcoal font-semibold"
+          style={{ fontFamily: "Inter, sans-serif" }}
+        >
+          {heading}
+        </span>
+      </motion.div>
+      <motion.div
+        className="glass-panel p-2.5 sm:p-4 rounded-2xl bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.2)] backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.1)] overflow-hidden"
+        whileHover={{ scale: 1.01 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="liquid-bg pointer-events-none"></div>
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-3 md:gap-6 relative z-10">
+          {(['days', 'hours', 'minutes', 'seconds'] as const).map((unit) => {
+            const value = timeLeft[unit];
+            const label = unit.charAt(0).toUpperCase() + unit.slice(1);
+            const shortLabel = unit === 'days' ? 'Days' : unit === 'hours' ? 'Hours' : unit === 'minutes' ? 'Mins' : 'Secs';
+            return (
+              <motion.div key={unit} className="glass-panel group rounded-xl overflow-hidden" whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
+                <Card className="relative bg-[rgba(255,255,255,0.6)] border-[rgba(255,255,255,0.3)] backdrop-blur-xl shadow-[0_4px_16px_0_rgba(0,0,0,0.1)] overflow-hidden rounded-xl border">
+                  <CardContent className="p-2 sm:p-4 text-center relative z-10 flex flex-col items-center justify-center">
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={value}
+                        initial={{ y: 50, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: -50, opacity: 0 }}
+                        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                        className="text-xl sm:text-2xl md:text-3xl font-bold text-[#333333] drop-shadow-xs leading-none"
+                        style={{ fontFamily: "Cinzel, serif" }}
+                      >
+                        {value.toString().padStart(2, '0')}
+                      </motion.div>
+                    </AnimatePresence>
+                    <div className="text-[10px] sm:text-xs uppercase tracking-normal sm:tracking-wider text-[#555555] mt-1.5 font-semibold truncate w-full text-center">
+                      <span className="hidden sm:inline">{label}</span>
+                      <span className="sm:hidden">{shortLabel}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+const Hero = React.memo(function Hero({
   celebrate,
   hero,
   event,
@@ -659,7 +726,6 @@ function Hero({
   onApplyAsCoLeader,
   onLearnMore,
 }: {
-  timeLeft: { days: number; hours: number; minutes: number; seconds: number };
   celebrate: boolean;
   hero: SiteContent['hero'];
   event: SiteContent['event'];
@@ -755,65 +821,10 @@ function Hero({
             </div>
 
             {event && event.countdownVisible && (
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.8 }}
-                className="max-w-xl mx-auto">
-
-                <motion.div
-                  className="text-center mb-4 sm:mb-6"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.2 }}>
-
-                  <span
-                    className="text-lg sm:text-xl md:text-2xl text-[#333333] glass-text-charcoal font-semibold"
-                    style={{ fontFamily: "Inter, sans-serif" }}>
-                    {event.countdownHeading}
-                  </span>
-                </motion.div>
-                <motion.div
-                  className="glass-panel p-2.5 sm:p-4 rounded-2xl bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.2)] backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.1)] overflow-hidden"
-                  whileHover={{ scale: 1.01 }}
-                  transition={{ duration: 0.3 }}>
-
-                  <div className="liquid-bg pointer-events-none"></div>
-                  <div className="grid grid-cols-4 gap-1.5 sm:gap-3 md:gap-6 relative z-10">
-                    {(['days', 'hours', 'minutes', 'seconds'] as const).map((unit) => {
-                      const value = timeLeft[unit];
-                      const label = unit.charAt(0).toUpperCase() + unit.slice(1);
-                      const shortLabel = unit === 'days' ? 'Days' : unit === 'hours' ? 'Hours' : unit === 'minutes' ? 'Mins' : 'Secs';
-                      return (
-                        <motion.div key={unit} className="glass-panel group rounded-xl overflow-hidden" whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
-                          <Card className="relative bg-[rgba(255,255,255,0.6)] border-[rgba(255,255,255,0.3)] backdrop-blur-xl shadow-[0_4px_16px_0_rgba(0,0,0,0.1)] overflow-hidden rounded-xl border">
-                            <CardContent className="p-2 sm:p-4 text-center relative z-10 flex flex-col items-center justify-center">
-                              <AnimatePresence mode="wait">
-                                <motion.div
-                                  key={value}
-                                  initial={{ y: 50, opacity: 0 }}
-                                  animate={{ y: 0, opacity: 1 }}
-                                  exit={{ y: -50, opacity: 0 }}
-                                  transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                                  className="text-xl sm:text-2xl md:text-3xl font-bold text-[#333333] drop-shadow-xs leading-none"
-                                  style={{ fontFamily: "Cinzel, serif" }}>
-
-                                  {value.toString().padStart(2, '0')}
-                                </motion.div>
-                              </AnimatePresence>
-                              <div className="text-[10px] sm:text-xs uppercase tracking-normal sm:tracking-wider text-[#555555] mt-1.5 font-semibold truncate w-full text-center">
-                                <span className="hidden sm:inline">{label}</span>
-                                <span className="sm:hidden">{shortLabel}</span>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </motion.div>);
-
-                    })}
-                  </div>
-                </motion.div>
-              </motion.div>
+              <CountdownTimer
+                targetDateString={event.targetDate}
+                heading={event.countdownHeading}
+              />
             )}
           </div>
         </motion.div>
@@ -824,14 +835,16 @@ function Hero({
       </div>
     </section>);
 
-}
+});
 
-// New: Golden sparkles rain on celebration
+// Golden sparkles rain on celebration
 function GoldenSparkles({ celebrate }: {celebrate: boolean;}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
-    if (!celebrate) return;
+    if (!celebrate || typeof window === 'undefined') return;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
 
     const canvas = document.createElement('canvas');
     canvas.style.position = 'fixed';
@@ -883,12 +896,14 @@ function GoldenSparkles({ celebrate }: {celebrate: boolean;}) {
     }, 800);
 
     let raf: number;
+    let isRunning = true;
+
     const animate = () => {
-      if (!canvasRef.current) return;
+      if (!isRunning || !canvasRef.current) return;
       raf = requestAnimationFrame(animate);
-      const ctx = canvasRef.current.getContext('2d');
-      if (!ctx) return;
-      ctx.clearRect(0, 0, w, h);
+      const currentCtx = canvasRef.current.getContext('2d');
+      if (!currentCtx) return;
+      currentCtx.clearRect(0, 0, w, h);
 
       for (let i = sparks.length - 1; i >= 0; i--) {
         const s = sparks[i];
@@ -900,13 +915,13 @@ function GoldenSparkles({ celebrate }: {celebrate: boolean;}) {
         }
 
         const alpha = s.life / 150;
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
-        ctx.shadowColor = '#FFD700';
-        ctx.shadowBlur = 10;
-        ctx.fill();
-        ctx.shadowBlur = 0;
+        currentCtx.beginPath();
+        currentCtx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+        currentCtx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
+        currentCtx.shadowColor = '#FFD700';
+        currentCtx.shadowBlur = 10;
+        currentCtx.fill();
+        currentCtx.shadowBlur = 0;
       }
 
       if (sparks.length === 0 && bursts >= 3) {
@@ -916,14 +931,28 @@ function GoldenSparkles({ celebrate }: {celebrate: boolean;}) {
         }
         canvasRef.current = null;
         window.removeEventListener('resize', resize);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+        isRunning = false;
       }
     };
-    animate();
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        if (raf) cancelAnimationFrame(raf);
+      } else if (isRunning && canvasRef.current) {
+        raf = requestAnimationFrame(animate);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    raf = requestAnimationFrame(animate);
 
     return () => {
+      isRunning = false;
       clearInterval(interval);
       if (raf) cancelAnimationFrame(raf);
       window.removeEventListener('resize', resize);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       if (canvasRef.current && document.body.contains(canvasRef.current)) {
         document.body.removeChild(canvasRef.current);
       }
@@ -934,17 +963,27 @@ function GoldenSparkles({ celebrate }: {celebrate: boolean;}) {
   return null;
 }
 
-// Modified: Confetti burst on celebration
+// Confetti burst on celebration and continuous subtle drift
 function Confetti({ celebrate }: {celebrate: boolean;}) {
-  // Continuous subtle confetti
-  const pieces = Array.from({ length: 50 }).map((_, i) => i);
+  const pieces = useMemo(() => Array.from({ length: 50 }).map((_, i) => ({
+    id: i,
+    left: ((i * 17 + 3) % 100),
+    delay: ((i * 0.45) % 3),
+    size: 6 + ((i * 2.1) % 8),
+    color: (["#FFE66D", "#E0E0E0", "#ffffff"] as const)[i % 3],
+    duration: 5 + ((i * 1.4) % 6)
+  })), []);
+
   // Burst confetti on load
   useEffect(() => {
-    if (!celebrate) return;
+    if (!celebrate || typeof window === 'undefined') return;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
 
     const burstPieces = Array.from({ length: 200 }).map((_, i) => i);
     const centerX = window.innerWidth / 2;
     const centerY = window.innerHeight / 2;
+    const createdSparks: HTMLDivElement[] = [];
 
     burstPieces.forEach((_, i) => {
       const angle = Math.PI * 2 * i / burstPieces.length;
@@ -960,46 +999,65 @@ function Confetti({ celebrate }: {celebrate: boolean;}) {
       spark.style.pointerEvents = 'none';
       spark.style.zIndex = '1000';
       document.body.appendChild(spark);
+      createdSparks.push(spark);
 
       const anim = spark.animate([
-      { transform: 'translate(0, 0) scale(1)', opacity: 1 },
-      {
-        transform: `translate(${Math.cos(angle) * velocity * 50}px, ${Math.sin(angle) * velocity * 50}px) scale(0)`,
-        opacity: 0
-      }],
-      {
+        { transform: 'translate(0, 0) scale(1)', opacity: 1 },
+        {
+          transform: `translate(${Math.cos(angle) * velocity * 50}px, ${Math.sin(angle) * velocity * 50}px) scale(0)`,
+          opacity: 0
+        }
+      ], {
         duration: 2000 + Math.random() * 1000,
         easing: 'ease-out'
       });
 
-      anim.onfinish = () => spark.remove();
+      anim.onfinish = () => {
+        spark.remove();
+        const idx = createdSparks.indexOf(spark);
+        if (idx !== -1) createdSparks.splice(idx, 1);
+      };
     });
+
+    return () => {
+      createdSparks.forEach((s) => s.remove());
+    };
   }, [celebrate]);
 
   return (
     <div aria-hidden className="pointer-events-none fixed inset-0 -z-20 overflow-hidden">
       <style>{`@keyframes fall { to { transform: translateY(110vh) rotate(1turn); opacity: .9; } }`}</style>
-      {pieces.map((i) => {
-        const left = Math.random() * 100;
-        const delay = Math.random() * 3;
-        const size = 6 + Math.random() * 8;
-        const colors = ["#FFE66D", "#E0E0E0", "#ffffff"] as const;
-        const color = colors[i % colors.length];
-        const duration = 5 + Math.random() * 6;
-        return (
-          <span key={i} className="absolute top-[-10vh] rounded" style={{
-            left: `${left}%`, width: size, height: size, background: color, filter: 'drop-shadow(0 0 6px rgba(224,224,224,.6))',
-            animation: `fall ${duration}s linear ${delay}s infinite`
-          }} />);
-
-      })}
-    </div>);
-
+      {pieces.map((p) => (
+        <span
+          key={p.id}
+          className="absolute top-[-10vh] rounded"
+          style={{
+            left: `${p.left}%`,
+            width: p.size,
+            height: p.size,
+            background: p.color,
+            filter: 'drop-shadow(0 0 6px rgba(224,224,224,.6))',
+            animation: `fall ${p.duration}s linear ${p.delay}s infinite`,
+            willChange: 'transform'
+          }}
+        />
+      ))}
+    </div>
+  );
 }
 
-// New: Fireworks with initial bursts
+// Fireworks with initial bursts and visibility-aware continuous effect
 function Fireworks({ celebrate }: {celebrate: boolean;}) {
+  const celebrateRef = useRef(celebrate);
   useEffect(() => {
+    celebrateRef.current = celebrate;
+  }, [celebrate]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
     const canvas = document.createElement('canvas');
     canvas.className = 'fixed inset-0 -z-30 pointer-events-none';
     Object.assign(canvas.style, { position: 'fixed', inset: '0', zIndex: '-30', pointerEvents: 'none' });
@@ -1042,25 +1100,30 @@ function Fireworks({ celebrate }: {celebrate: boolean;}) {
     }
 
     // Initial celebration bursts
-    if (celebrate) {
+    let burstInterval: NodeJS.Timeout | null = null;
+    if (celebrateRef.current) {
       let burstCount = 0;
-      const initialBursts = setInterval(() => {
+      burstInterval = setInterval(() => {
         burst(Math.random() * w, h * 0.3 + Math.random() * h * 0.4, true);
         burstCount++;
-        if (burstCount >= 5) {
-          clearInterval(initialBursts);
+        if (burstCount >= 5 && burstInterval) {
+          clearInterval(burstInterval);
+          burstInterval = null;
         }
       }, 500);
     }
 
     let frame = 0;
     let raf: number;
+    let isRunning = true;
+
     const loop = () => {
+      if (!isRunning) return;
       raf = requestAnimationFrame(loop);
       frame++;
       ctx.clearRect(0, 0, w, h);
-      // More frequent background bursts for continuous fireworks effect
-      if (frame % 60 === 0) {// Every ~1 second at 60fps
+      // Continuous background bursts
+      if (frame % 60 === 0) {
         burst(Math.random() * w, h * 0.2 + Math.random() * h * 0.5, false);
       }
       // Update particles
@@ -1070,9 +1133,12 @@ function Fireworks({ celebrate }: {celebrate: boolean;}) {
         p.y += p.vy;
         p.vy += 0.03; // gravity
         p.life -= 1;
-        if (p.life <= 0) {particles.splice(i, 1);continue;}
+        if (p.life <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
         const alpha = Math.max(0, Math.min(1, p.life / 120));
-        const size = 3 + (1 - alpha) * 2; // Larger when fading
+        const size = 3 + (1 - alpha) * 2;
         ctx.beginPath();
         ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
         ctx.fillStyle = p.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
@@ -1081,72 +1147,95 @@ function Fireworks({ celebrate }: {celebrate: boolean;}) {
         ctx.fill();
         ctx.shadowBlur = 0;
       }
-      // Cleanup check: remove canvas if no particles and not celebrating
-      if (particles.length === 0 && !celebrate && frame > 300) {
+      // Cleanup check
+      if (particles.length === 0 && !celebrateRef.current && frame > 300) {
         cancelAnimationFrame(raf);
         if (document.body.contains(canvas)) {
           document.body.removeChild(canvas);
         }
         window.removeEventListener('resize', onResize);
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+        isRunning = false;
         return;
       }
     };
-    loop();
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        if (raf) cancelAnimationFrame(raf);
+      } else if (isRunning) {
+        raf = requestAnimationFrame(loop);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    raf = requestAnimationFrame(loop);
 
     return () => {
+      isRunning = false;
+      if (burstInterval) clearInterval(burstInterval);
       if (raf) cancelAnimationFrame(raf);
       window.removeEventListener('resize', onResize);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       if (document.body.contains(canvas)) {
         document.body.removeChild(canvas);
       }
     };
-  }, [celebrate]);
+  }, []);
 
   return null;
 }
 
-// New: Sparkle cursor using lightweight canvas emitter
+// Sparkle cursor using on-demand RAF emitter (stops rendering when mouse is static)
 function SparkleCursor() {
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
     const canvas = document.createElement('canvas');
     canvas.className = 'fixed inset-0 z-50 pointer-events-none';
     Object.assign(canvas.style, { position: 'fixed', inset: '0', zIndex: '50', pointerEvents: 'none' });
     document.body.appendChild(canvas);
     const ctx = canvas.getContext('2d');
-    if (!ctx) return () => {document.body.removeChild(canvas);};
+    if (!ctx) {
+      if (document.body.contains(canvas)) document.body.removeChild(canvas);
+      return;
+    }
 
     let w = canvas.width = window.innerWidth;
     let h = canvas.height = window.innerHeight;
-    const onResize = () => {w = canvas.width = window.innerWidth;h = canvas.height = window.innerHeight;};
+    const onResize = () => {
+      w = canvas.width = window.innerWidth;
+      h = canvas.height = window.innerHeight;
+    };
     window.addEventListener('resize', onResize);
 
     type S = {x: number;y: number;vx: number;vy: number;life: number;color: string;};
     let sparks: S[] = [];
-    let mx = w / 2,my = h / 2;
+    let mx = w / 2, my = h / 2;
+    let raf = 0;
+    let isTicking = false;
 
     const colors = ['#FFE66D', '#E0E0E0', '#FFFFFF'];
-    const onMove = (e: MouseEvent) => {
-      mx = e.clientX;my = e.clientY;
-      for (let i = 0; i < 4; i++) {
-        sparks.push({
-          x: mx, y: my,
-          vx: (Math.random() - 0.5) * 1.2,
-          vy: (Math.random() - 0.5) * 1.2,
-          life: 24 + Math.random() * 12,
-          color: colors[Math.floor(Math.random() * colors.length)]
-        });
-      }
-    };
-    window.addEventListener('mousemove', onMove);
 
-    let raf = 0 as number;
     const tick = () => {
+      if (sparks.length === 0) {
+        ctx.clearRect(0, 0, w, h);
+        isTicking = false;
+        return;
+      }
       raf = requestAnimationFrame(tick);
       ctx.clearRect(0, 0, w, h);
       for (let i = sparks.length - 1; i >= 0; i--) {
         const s = sparks[i];
-        s.x += s.vx;s.y += s.vy;s.life -= 1;
-        if (s.life <= 0) {sparks.splice(i, 1);continue;}
+        s.x += s.vx;
+        s.y += s.vy;
+        s.life -= 1;
+        if (s.life <= 0) {
+          sparks.splice(i, 1);
+          continue;
+        }
         const a = Math.max(0, s.life / 30);
         ctx.beginPath();
         ctx.arc(s.x, s.y, 1.8, 0, Math.PI * 2);
@@ -1159,13 +1248,49 @@ function SparkleCursor() {
         ctx.shadowBlur = 0;
       }
     };
-    tick();
+
+    const startTicking = () => {
+      if (!isTicking && !document.hidden) {
+        isTicking = true;
+        raf = requestAnimationFrame(tick);
+      }
+    };
+
+    const onMove = (e: MouseEvent) => {
+      mx = e.clientX;
+      my = e.clientY;
+      for (let i = 0; i < 4; i++) {
+        sparks.push({
+          x: mx,
+          y: my,
+          vx: (Math.random() - 0.5) * 1.2,
+          vy: (Math.random() - 0.5) * 1.2,
+          life: 24 + Math.random() * 12,
+          color: colors[Math.floor(Math.random() * colors.length)]
+        });
+      }
+      startTicking();
+    };
+    window.addEventListener('mousemove', onMove, { passive: true });
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        if (raf) cancelAnimationFrame(raf);
+        isTicking = false;
+      } else if (sparks.length > 0) {
+        startTicking();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
-      cancelAnimationFrame(raf);
+      if (raf) cancelAnimationFrame(raf);
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('resize', onResize);
-      document.body.removeChild(canvas);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (document.body.contains(canvas)) {
+        document.body.removeChild(canvas);
+      }
     };
   }, []);
   return null;
@@ -1360,6 +1485,10 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
                           src={l.avatar} 
                           alt={l.name ?? `Leader ${l.position}`}
                           className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                          width={128}
+                          height={128}
                         />
                         {/* Inner glow */}
                         <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/20" />
@@ -1414,6 +1543,10 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
                           src={l.avatar} 
                           alt={l.name ?? `Co-Leader ${l.position}`}
                           className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                          width={128}
+                          height={128}
                         />
                         {/* Inner glow */}
                         <div className="absolute inset-0 rounded-full ring-1 ring-inset ring-white/20" />
@@ -2000,14 +2133,14 @@ function Footer() {
 }
 
 function FloatingParticles() {
-  const particles = Array.from({ length: 20 }).map((_, i) => ({
+  const particles = useMemo(() => Array.from({ length: 20 }).map((_, i) => ({
     id: i,
-    delay: Math.random() * 10,
-    duration: 15 + Math.random() * 10,
-    left: Math.random() * 100,
-    size: 4 + Math.random() * 8,
-    color: ['#FFD700', '#6EC6FF', '#1A237E', '#D7C4F3', '#B9FBC0'][Math.floor(Math.random() * 5)]
-  }));
+    delay: ((i * 1.7) % 10),
+    duration: 15 + ((i * 3.1) % 10),
+    left: ((i * 19 + 7) % 100),
+    size: 4 + ((i * 2.3) % 8),
+    color: ['#FFD700', '#6EC6FF', '#1A237E', '#D7C4F3', '#B9FBC0'][i % 5]
+  })), []);
 
   return (
     <div className="pointer-events-none fixed inset-0 -z-20 overflow-hidden">
@@ -2021,7 +2154,8 @@ function FloatingParticles() {
           width: p.size,
           height: p.size,
           backgroundColor: p.color,
-          boxShadow: `0 0 10px ${p.color}40`
+          boxShadow: `0 0 10px ${p.color}40`,
+          willChange: 'transform'
         }}
         initial={{ y: '-100vh' }}
         animate={{
@@ -2034,8 +2168,15 @@ function FloatingParticles() {
           repeat: Infinity,
           ease: 'linear'
         }} />
-
       )}
     </div>);
-
 }
+
+const MemoizedNavbar = React.memo(Navbar);
+const MemoizedParallaxBackground = React.memo(ParallaxBackground);
+const MemoizedAbout = React.memo(About);
+const MemoizedLeadersGrid = React.memo(LeadersGrid);
+const MemoizedFAQ = React.memo(FAQ);
+const MemoizedContact = React.memo(Contact);
+const MemoizedFooter = React.memo(Footer);
+const MemoizedFloatingParticles = React.memo(FloatingParticles);

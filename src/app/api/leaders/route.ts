@@ -13,6 +13,12 @@ const NO_CACHE_HEADERS = {
   'Vercel-CDN-Cache-Control': 'no-store',
 };
 
+const PUBLIC_LEADERS_CACHE_HEADERS = {
+  'Cache-Control': 'public, max-age=5, s-maxage=10, stale-while-revalidate=59',
+  'CDN-Cache-Control': 'public, s-maxage=10, stale-while-revalidate=59',
+  'Vercel-CDN-Cache-Control': 'public, s-maxage=10, stale-while-revalidate=59',
+};
+
 export async function GET() {
   try {
     await ensureDbInitialized();
@@ -24,7 +30,7 @@ export async function GET() {
     if (allLeaders && allLeaders.length > 0) {
       return NextResponse.json(allLeaders, {
         status: 200,
-        headers: NO_CACHE_HEADERS,
+        headers: PUBLIC_LEADERS_CACHE_HEADERS,
       });
     }
   } catch (error) {
@@ -40,7 +46,7 @@ export async function GET() {
   // Development/Test fallback
   return NextResponse.json(memoryStore.getLeaders(), {
     status: 200,
-    headers: NO_CACHE_HEADERS,
+    headers: PUBLIC_LEADERS_CACHE_HEADERS,
   });
 }
 
