@@ -4,19 +4,12 @@ import {
   ADMIN_COOKIE_NAME,
   ADMIN_SESSION_TTL_MS,
   createAdminSessionToken,
+  getAdminPassword,
 } from '@/lib/admin-auth';
 
 export const runtime = 'nodejs';
 
 export async function POST(request: NextRequest) {
-  const secret = process.env.ADMIN_SECRET;
-  if (!secret || secret.length < 32) {
-    return NextResponse.json(
-      { error: 'Admin login is not configured. Set ADMIN_SECRET to a random value of at least 32 characters.' },
-      { status: 503 },
-    );
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -29,17 +22,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Enter the admin password.' }, { status: 400 });
   }
 
+  const expectedPassword = getAdminPassword();
   const providedHash = createHash('sha256').update(password).digest();
-  const expectedHash = createHash('sha256').update(secret).digest();
+  const expectedHash = createHash('sha256').update(expectedPassword).digest();
+
   if (!timingSafeEqual(providedHash, expectedHash)) {
     return NextResponse.json({ error: 'Incorrect admin password.' }, { status: 401 });
   }
 
   const expiresAt = Date.now() + ADMIN_SESSION_TTL_MS;
   const token = createAdminSessionToken(expiresAt);
-  if (!token) {
-    return NextResponse.json({ error: 'Admin login is not configured.' }, { status: 503 });
-  }
 
   const response = NextResponse.json({ success: true });
   response.cookies.set(ADMIN_COOKIE_NAME, token, {

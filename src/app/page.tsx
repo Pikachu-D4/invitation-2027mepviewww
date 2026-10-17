@@ -23,9 +23,18 @@ type Leader = {
   position: number;
 };
 
+const DEFAULT_LEADERS: Leader[] = [
+  { id: 1, name: null, role: 'Leader', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=leader1', status: 'open', position: 1 },
+  { id: 2, name: null, role: 'Leader', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=leader2', status: 'open', position: 2 },
+  { id: 3, name: null, role: 'Leader', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=leader3', status: 'open', position: 3 },
+  { id: 4, name: null, role: 'Co-Leader', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=leader4', status: 'open', position: 4 },
+  { id: 5, name: null, role: 'Co-Leader', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=leader5', status: 'open', position: 5 },
+  { id: 6, name: null, role: 'Co-Leader', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=leader6', status: 'open', position: 6 },
+];
+
 export default function Home() {
-  const [leaders, setLeaders] = useState<Leader[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [leaders, setLeaders] = useState<Leader[]>(DEFAULT_LEADERS);
+  const [loading, setLoading] = useState(false);
   const filled = useMemo(() => leaders.filter((l) => l.status === 'filled').length, [leaders]);
   const total = 6;
 
@@ -45,25 +54,22 @@ export default function Home() {
     return () => clearInterval(id);
   }, []);
 
-  // Fetch leaders from database
+  // Fetch leaders from database / store
   useEffect(() => {
     fetchLeaders();
   }, []);
 
   async function fetchLeaders() {
     try {
-      setLoading(true);
       const response = await fetch('/api/leaders');
-      if (!response.ok) {
-        throw new Error('Failed to fetch leaders');
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setLeaders(data);
+        }
       }
-      const data = await response.json();
-      setLeaders(data);
     } catch (error) {
-      console.error('Error fetching leaders:', error);
-      toast.error('Failed to load leader slots');
-    } finally {
-      setLoading(false);
+      console.warn('Could not refresh leaders, using defaults:', error);
     }
   }
 

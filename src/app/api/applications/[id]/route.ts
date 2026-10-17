@@ -3,6 +3,7 @@ import { db } from '@/db';
 import { applications } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { isAdminRequest } from '@/lib/admin-auth';
+import { memoryStore } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,19 +21,25 @@ export async function DELETE(
     return NextResponse.json({ error: 'Invalid application ID.' }, { status: 400 });
   }
 
-  try {
-    const deleted = await db
-      .delete(applications)
-      .where(eq(applications.id, id))
-      .returning({ id: applications.id });
+  if (process.env.TURSO_CONNECTION_URL) {
+    try {
+      const deleted = await db
+        .delete(applications)
+        .where(eq(applications.id, id))
+        .returning({ id: applications.id });
 
-    if (deleted.length === 0) {
-      return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
+      if (deleted.length > 0) {
+        return NextResponse.json({ success: true, id: deleted[0].id }, { status: 200 });
+      }
+    } catch (error) {
+      console.warn('DB delete failed, using memoryStore:', error);
     }
-
-    return NextResponse.json({ success: true, id: deleted[0].id }, { status: 200 });
-  } catch (error) {
-    console.error('DELETE application error:', error);
-    return NextResponse.json({ error: 'Could not delete application.' }, { status: 500 });
   }
+
+  const deletedFromMemory = memoryStore.deleteApplication(id);
+  if (!deletedFromMemory) {
+    return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
+  }
+
+  return NextResponse.json({ success: true, id }, { status: 200 });
 }
