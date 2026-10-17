@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, ensureDbInitialized } from '@/db';
+import { db, getClient, ensureDbInitialized, isProduction } from '@/db';
 import { applications, leaders } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { isAdminRequest } from '@/lib/admin-auth';
@@ -35,7 +35,7 @@ export async function PATCH(
   }
 
   const allowedStatuses = ['pending', 'approved', 'rejected'];
-  const { status, adminNotes } = body || {};
+  const { status, adminNotes, leaderId } = body || {};
 
   if (status !== undefined && !allowedStatuses.includes(status)) {
     return NextResponse.json(
@@ -51,57 +51,181 @@ export async function PATCH(
     );
   }
 
-  const updates: { status?: string; adminNotes?: string; updatedAt: Date } = {
-    updatedAt: new Date(),
-  };
-
-  if (status !== undefined) updates.status = status;
-  if (adminNotes !== undefined) updates.adminNotes = adminNotes.slice(0, 1000);
+  if (leaderId !== undefined && leaderId !== null) {
+    if (typeof leaderId !== 'number' || leaderId < 1 || leaderId > 6) {
+      return NextResponse.json(
+        { error: 'leaderId must be a number between 1 and 6, or null to unassign.', code: 'INVALID_LEADER_ID' },
+        { status: 400 }
+      );
+    }
+  }
 
   try {
     await ensureDbInitialized();
-    const result = await db
-      .update(applications)
-      .set(updates)
-      .where(eq(applications.id, id))
-      .returning();
+    const client = getClient();
+    const now = Date.now();
 
-    if (result.length === 0) {
-      if (process.env.NODE_ENV === 'production') {
-        return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
-      }
-      const updatedMem = memoryStore.updateApplication(id, {
-        status: updates.status,
-        adminNotes: updates.adminNotes,
-      });
-      if (!updatedMem) {
-        return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
-      }
-      return NextResponse.json({ success: true, application: updatedMem }, { headers: NO_CACHE_HEADERS });
-    }
-
-    memoryStore.updateApplication(id, {
-      status: updates.status,
-      adminNotes: updates.adminNotes,
+    // 1. Fetch current application record
+    const appQuery = await client.execute({
+      sql: 'SELECT * FROM applications WHERE id = ? LIMIT 1;',
+      args: [id],
     });
 
-    return NextResponse.json({ success: true, application: result[0] }, { headers: NO_CACHE_HEADERS });
-  } catch (error: any) {
-    console.error('PATCH application error:', error);
-    if (process.env.NODE_ENV === 'production') {
-      return NextResponse.json(
-        { error: 'Failed to update application in production database.' },
-        { status: 500 }
-      );
-    }
-    const updatedMem = memoryStore.updateApplication(id, {
-      status: updates.status,
-      adminNotes: updates.adminNotes,
-    });
-    if (!updatedMem) {
+    if (appQuery.rows.length === 0) {
       return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
     }
-    return NextResponse.json({ success: true, application: updatedMem }, { headers: NO_CACHE_HEADERS });
+
+    const currentApp = appQuery.rows[0];
+    const oldLeaderId = currentApp.leader_id ? Number(currentApp.leader_id) : null;
+    let newLeaderId: number | null = oldLeaderId;
+    let finalStatus = (status as string) || (currentApp.status as string);
+
+    // 2. Handle Seat Assignment / Reassignment / Release
+    if (leaderId !== undefined) {
+      if (leaderId === null) {
+        // Unassigning applicant
+        if (oldLeaderId) {
+          await client.execute({
+            sql: `UPDATE leaders
+                  SET name = NULL,
+                      avatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=leader' || position,
+                      status = 'open',
+                      updated_at = ?
+                  WHERE id = ?;`,
+            args: [now, oldLeaderId],
+          });
+        }
+        newLeaderId = null;
+        if (status === undefined) {
+          finalStatus = 'pending';
+        }
+      } else {
+        // Assigning or moving to slot `leaderId`
+        const targetLeaderId = Number(leaderId);
+
+        // Check if target slot is already filled by someone else
+        const targetCheck = await client.execute({
+          sql: 'SELECT * FROM leaders WHERE id = ? LIMIT 1;',
+          args: [targetLeaderId],
+        });
+
+        if (targetCheck.rows.length === 0) {
+          return NextResponse.json({ error: 'Leader slot does not exist.', code: 'SLOT_NOT_FOUND' }, { status: 400 });
+        }
+
+        const targetSlot = targetCheck.rows[0];
+
+        // Concurrency-safe atomic claim:
+        // Update slot if it is open OR if it's already held by this same application
+        const claimRes = await client.execute({
+          sql: `UPDATE leaders
+                SET name = ?,
+                    avatar = ?,
+                    status = 'filled',
+                    updated_at = ?
+                WHERE id = ? AND (status = 'open' OR id = ?);`,
+          args: [
+            currentApp.name,
+            currentApp.profile_image,
+            now,
+            targetLeaderId,
+            oldLeaderId || 0,
+          ],
+        });
+
+        if (claimRes.rowsAffected === 0) {
+          return NextResponse.json(
+            {
+              error: `Slot #${targetSlot.position} (${targetSlot.role}) is already occupied by another applicant.`,
+              code: 'SEAT_OCCUPIED',
+            },
+            { status: 409 }
+          );
+        }
+
+        // If applicant was previously in a different slot, release that previous slot
+        if (oldLeaderId && oldLeaderId !== targetLeaderId) {
+          await client.execute({
+            sql: `UPDATE leaders
+                  SET name = NULL,
+                      avatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=leader' || position,
+                      status = 'open',
+                      updated_at = ?
+                  WHERE id = ?;`,
+            args: [now, oldLeaderId],
+          });
+        }
+
+        newLeaderId = targetLeaderId;
+        // Assigning a seat confirms/approves the application unless explicitly set
+        if (status === undefined) {
+          finalStatus = 'approved';
+        }
+      }
+    } else {
+      // leaderId was not provided, but status is changing
+      if (status === 'rejected' || status === 'pending') {
+        // If transitioning away from approved, release any held seat
+        if (oldLeaderId) {
+          await client.execute({
+            sql: `UPDATE leaders
+                  SET name = NULL,
+                      avatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=leader' || position,
+                      status = 'open',
+                      updated_at = ?
+                  WHERE id = ?;`,
+            args: [now, oldLeaderId],
+          });
+          newLeaderId = null;
+        }
+      } else if (status === 'approved' && !oldLeaderId) {
+        // Approved applications must have an actual seat assignment under this workflow
+        return NextResponse.json(
+          {
+            error: 'To approve this application, please use "Assign & Approve" to allocate an available seat.',
+            code: 'ASSIGNMENT_REQUIRED',
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // 3. Update application record
+    const updatedNotes = adminNotes !== undefined ? adminNotes.slice(0, 1000) : currentApp.admin_notes;
+
+    const updateRes = await client.execute({
+      sql: `UPDATE applications
+            SET status = ?,
+                leader_id = ?,
+                admin_notes = ?,
+                updated_at = ?
+            WHERE id = ?
+            RETURNING *;`,
+      args: [finalStatus, newLeaderId, updatedNotes, now, id],
+    });
+
+    const updatedApp = updateRes.rows[0];
+
+    // Keep memoryStore synchronized for dev/fallback
+    memoryStore.updateApplication(id, {
+      status: finalStatus,
+      adminNotes: updatedNotes,
+      leaderId: newLeaderId,
+    });
+
+    return NextResponse.json(
+      {
+        success: true,
+        application: updatedApp,
+      },
+      { headers: NO_CACHE_HEADERS }
+    );
+  } catch (error: any) {
+    console.error('PATCH application error:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Failed to update application.' },
+      { status: 500 }
+    );
   }
 }
 
@@ -121,52 +245,49 @@ export async function DELETE(
 
   try {
     await ensureDbInitialized();
+    const client = getClient();
+    const now = Date.now();
 
     // Check which application and leader slot is affected
-    const existingApps = await db
-      .select()
-      .from(applications)
-      .where(eq(applications.id, id))
-      .limit(1);
+    const existingApps = await client.execute({
+      sql: 'SELECT * FROM applications WHERE id = ? LIMIT 1;',
+      args: [id],
+    });
 
-    const deleted = await db
-      .delete(applications)
-      .where(eq(applications.id, id))
-      .returning({ id: applications.id });
+    if (existingApps.rows.length === 0) {
+      return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
+    }
+
+    const app = existingApps.rows[0];
+    const leaderId = app.leader_id ? Number(app.leader_id) : null;
+
+    // Delete application
+    await client.execute({
+      sql: 'DELETE FROM applications WHERE id = ?;',
+      args: [id],
+    });
 
     // If associated with a leader, reset that slot back to open
-    if (existingApps.length > 0 && existingApps[0].leaderId) {
-      const leaderId = existingApps[0].leaderId;
-      await db
-        .update(leaders)
-        .set({
-          name: null,
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=leader${leaderId}`,
-          status: 'open',
-          updatedAt: new Date(),
-        })
-        .where(eq(leaders.id, leaderId));
+    if (leaderId) {
+      await client.execute({
+        sql: `UPDATE leaders
+              SET name = NULL,
+                  avatar = 'https://api.dicebear.com/7.x/avataaars/svg?seed=leader' || position,
+                  status = 'open',
+                  updated_at = ?
+              WHERE id = ?;`,
+        args: [now, leaderId],
+      });
     }
 
     memoryStore.deleteApplication(id);
 
-    if (deleted.length === 0) {
-      if (process.env.NODE_ENV === 'production') {
-        return NextResponse.json({ error: 'Application not found.' }, { status: 404 });
-      }
-      return NextResponse.json({ success: true, id }, { status: 200, headers: NO_CACHE_HEADERS });
-    }
-
-    return NextResponse.json({ success: true, id: deleted[0].id }, { status: 200, headers: NO_CACHE_HEADERS });
-  } catch (error) {
-    console.error('DELETE application error:', error);
-    if (process.env.NODE_ENV === 'production') {
-      return NextResponse.json(
-        { error: 'Failed to delete application in production database.' },
-        { status: 500 }
-      );
-    }
-    memoryStore.deleteApplication(id);
     return NextResponse.json({ success: true, id }, { status: 200, headers: NO_CACHE_HEADERS });
+  } catch (error: any) {
+    console.error('DELETE application error:', error);
+    return NextResponse.json(
+      { error: error?.message || 'Failed to delete application in persistent database.' },
+      { status: 500 }
+    );
   }
 }

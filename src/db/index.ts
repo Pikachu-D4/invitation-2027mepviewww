@@ -141,8 +141,30 @@ export async function ensureDbInitialized(): Promise<void> {
         await client.execute('ALTER TABLE applications ADD COLUMN admin_notes TEXT');
       } catch {}
       try {
+        await client.execute('ALTER TABLE applications ADD COLUMN requested_role TEXT');
+      } catch {}
+      try {
+        await client.execute('ALTER TABLE applications ADD COLUMN requested_position INTEGER');
+      } catch {}
+      try {
+        await client.execute('ALTER TABLE applications ADD COLUMN instagram_username TEXT');
+      } catch {}
+      try {
         await client.execute('ALTER TABLE leaders ADD COLUMN position INTEGER');
       } catch {}
+
+      // 5b. Safe idempotent backfill: If an application has an assigned leader but no requested_role recorded,
+      // derive it from the assigned leader slot
+      try {
+        await client.execute(`
+          UPDATE applications
+          SET requested_role = (SELECT role FROM leaders WHERE leaders.id = applications.leader_id),
+              requested_position = (SELECT position FROM leaders WHERE leaders.id = applications.leader_id)
+          WHERE leader_id IS NOT NULL AND requested_role IS NULL;
+        `);
+      } catch (backfillErr) {
+        console.warn('Backfill skipped or failed gracefully:', backfillErr);
+      }
 
       // 6. Seed the 6 default leader slots if table has 0 rows
       const countRes = await client.execute('SELECT COUNT(*) as c FROM leaders');

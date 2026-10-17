@@ -116,11 +116,11 @@ export async function PATCH(request: NextRequest) {
       .where(eq(leaders.position, position))
       .returning();
 
-    // Disassociate application linked to this slot if any
+    // Disassociate application linked to this slot if any and return to pending/unassigned
     if (leaderToReset.length > 0) {
       await db
         .update(applications)
-        .set({ leaderId: null, updatedAt: currentTimestamp })
+        .set({ leaderId: null, status: 'pending', updatedAt: currentTimestamp })
         .where(eq(applications.leaderId, leaderToReset[0].id));
     }
 

@@ -26,6 +26,12 @@ import {
   ExternalLink,
   Globe,
   LayoutDashboard,
+  Instagram,
+  UserCheck,
+  ArrowRightLeft,
+  AlertTriangle,
+  Crown,
+  Sparkles,
 } from "lucide-react";
 import { ContentManager } from "@/components/admin/ContentManager";
 import { DEFAULT_SITE_CONTENT, type SiteContent } from "@/lib/content";
@@ -35,6 +41,9 @@ type Application = {
   name: string;
   email: string;
   whatsapp: string;
+  instagramUsername?: string | null;
+  requestedRole?: string | null;
+  requestedPosition?: number | null;
   bio: string | null;
   profileImage: string;
   status: string;
@@ -76,6 +85,8 @@ export default function AdminPage() {
   // Filters and search for applications
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
+  const [requestedRoleFilter, setRequestedRoleFilter] = useState<"all" | "Leader" | "Co-Leader">("all");
+  const [assignedFilter, setAssignedFilter] = useState<"all" | "assigned" | "unassigned">("all");
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "name">("newest");
 
   // Modals & interaction state
@@ -84,6 +95,15 @@ export default function AdminPage() {
   const [deletingApp, setDeletingApp] = useState<Application | null>(null);
   const [resettingSlot, setResettingSlot] = useState<Leader | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+
+  // Assign & Approve modal state
+  const [assigningApp, setAssigningApp] = useState<Application | null>(null);
+  const [selectedAssignSeat, setSelectedAssignSeat] = useState<number | null>(null);
+
+  // Move / Reassign modal state
+  const [reassigningApp, setReassigningApp] = useState<Application | null>(null);
+  const [selectedReassignSeat, setSelectedReassignSeat] = useState<number | null>(null);
+  const [confirmRoleChange, setConfirmRoleChange] = useState<boolean>(false);
 
   // Check if content has unsaved edits
   const isContentDirty = useMemo(() => {
@@ -149,19 +169,25 @@ export default function AdminPage() {
     setLoginError("");
 
     try {
-      const response = await fetch("/api/admin/login", {
+      const res = await fetch("/api/admin/auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: adminPassword }),
       });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(result.error || "Admin login failed.");
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setLoginError(data.error || "Authentication failed.");
+        return;
       }
+
+      setAuthenticated(true);
       setAdminPassword("");
+      toast.success("Welcome to MEP 2027 Admin Console!");
       await fetchData();
-    } catch (error) {
-      setLoginError(error instanceof Error ? error.message : "Admin login failed.");
+    } catch {
+      setLoginError("Could not connect to authentication service.");
     } finally {
       setLoggingIn(false);
     }
@@ -169,34 +195,36 @@ export default function AdminPage() {
 
   async function handleLogout() {
     try {
-      await fetch("/api/admin/logout", { method: "POST" });
-    } finally {
+      await fetch("/api/admin/auth", { method: "DELETE" });
       setAuthenticated(false);
       setApplications([]);
       setLeaders([]);
+      toast.info("Logged out successfully.");
+    } catch (error) {
+      console.error("Logout error:", error);
     }
   }
 
-  // Content Management: Save & Publish
+  // Content Management: Save Content
   async function handleSaveContent() {
     setIsSavingContent(true);
     try {
       const res = await fetch("/api/admin/content", {
-        method: "PATCH",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(siteContentState),
+        body: JSON.stringify({ content: siteContentState }),
       });
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || (data.details ? data.details.join(", ") : "Failed to save content"));
+        throw new Error(data.error || "Failed to save website content");
       }
 
       setOriginalContent(data.content);
       setSiteContentState(data.content);
-      setContentVersion(data.version || contentVersion + 1);
-      setContentUpdatedAt(new Date());
-      toast.success("Website content saved & published to homepage!");
+      setContentVersion(data.version);
+      setContentUpdatedAt(data.updatedAt);
+      toast.success("Website content saved and published successfully!");
       await fetchContentData();
     } catch (error: any) {
       toast.error(error.message || "Failed to save website content");
@@ -237,8 +265,117 @@ export default function AdminPage() {
     }
   }
 
+  // Open Assign & Approve modal
+  function openAssignModal(app: Application) {
+    setAssigningApp(app);
+    // If the applicant requested a specific position and that slot is open, preselect it
+    if (app.requestedPosition && app.requestedPosition >= 1 && app.requestedPosition <= 6) {
+      const slot = leaders.find((l) => l.position === app.requestedPosition);
+      if (slot && slot.status === "open") {
+        setSelectedAssignSeat(slot.id);
+        return;
+      }
+    }
+    // If preferred was flexible or occupied, preselect first open slot matching requested role
+    const matchingOpenSlot = leaders.find(
+      (l) => l.status === "open" && (!app.requestedRole || l.role === app.requestedRole)
+    );
+    if (matchingOpenSlot) {
+      setSelectedAssignSeat(matchingOpenSlot.id);
+    } else {
+      const anyOpen = leaders.find((l) => l.status === "open");
+      setSelectedAssignSeat(anyOpen ? anyOpen.id : null);
+    }
+  }
+
+  // Confirm Assign & Approve
+  async function confirmAssignAndApprove() {
+    if (!assigningApp || !selectedAssignSeat) {
+      toast.error("Please choose an available seat to assign.");
+      return;
+    }
+
+    setActionLoadingId(assigningApp.id);
+    try {
+      const res = await fetch(`/api/applications/${assigningApp.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leaderId: selectedAssignSeat,
+          status: "approved",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to assign seat.");
+      }
+
+      toast.success(`Assigned ${assigningApp.name} to Slot #${selectedAssignSeat} and approved!`);
+      setAssigningApp(null);
+      setSelectedAssignSeat(null);
+      await fetchData();
+    } catch (err: any) {
+      toast.error(err.message || "Seat assignment failed.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
+  // Open Move / Reassign modal
+  function openReassignModal(app: Application) {
+    setReassigningApp(app);
+    setSelectedReassignSeat(app.leaderId);
+    setConfirmRoleChange(false);
+  }
+
+  // Confirm Move / Reassign
+  async function confirmReassign() {
+    if (!reassigningApp) return;
+
+    setActionLoadingId(reassigningApp.id);
+    try {
+      const res = await fetch(`/api/applications/${reassigningApp.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leaderId: selectedReassignSeat, // number or null
+          status: selectedReassignSeat === null ? "pending" : "approved",
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to reassign seat.");
+      }
+
+      if (selectedReassignSeat === null) {
+        toast.success(`Moved ${reassigningApp.name} to waiting list (unassigned).`);
+      } else {
+        toast.success(`Successfully moved ${reassigningApp.name} to Slot #${selectedReassignSeat}!`);
+      }
+
+      setReassigningApp(null);
+      setSelectedReassignSeat(null);
+      setConfirmRoleChange(false);
+      await fetchData();
+    } catch (err: any) {
+      toast.error(err.message || "Reassignment failed.");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   // Update application status (approved, rejected, pending)
   async function handleStatusUpdate(id: number, newStatus: "approved" | "rejected" | "pending") {
+    const targetApp = applications.find((a) => a.id === id);
+
+    // If approving an unassigned application, direct to Assign & Approve modal
+    if (newStatus === "approved" && targetApp && !targetApp.leaderId) {
+      openAssignModal(targetApp);
+      return;
+    }
+
     setActionLoadingId(id);
     try {
       const res = await fetch(`/api/applications/${id}`, {
@@ -251,11 +388,17 @@ export default function AdminPage() {
         throw new Error(data.error || "Failed to update status");
       }
 
-      setApplications((prev) =>
-        prev.map((app) => (app.id === id ? { ...app, status: newStatus } : app))
-      );
+      await fetchData();
       if (selectedApp && selectedApp.id === id) {
-        setSelectedApp((prev) => (prev ? { ...prev, status: newStatus } : null));
+        setSelectedApp((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: newStatus,
+                leaderId: newStatus === "approved" ? prev.leaderId : null,
+              }
+            : null
+        );
       }
       toast.success(`Application marked as ${newStatus}`);
     } catch (error: any) {
@@ -312,14 +455,14 @@ export default function AdminPage() {
         throw new Error(data.error || "Failed to reset slot");
       }
 
-      toast.success(`Slot #${target.position} reset to open`);
+      toast.success(`Slot #${target.position} reset to open (assigned applicant moved to pending)`);
       await fetchData();
     } catch (error: any) {
       toast.error(error.message || "Failed to reset slot");
     }
   }
 
-  // CSV Export
+  // CSV Export with formula injection protection
   function exportToCSV() {
     if (applications.length === 0) {
       toast.error("No applications to export.");
@@ -331,29 +474,44 @@ export default function AdminPage() {
       "Name",
       "Email",
       "WhatsApp",
-      "Status",
+      "Instagram Username",
+      "Requested Role",
+      "Requested Position",
       "Assigned Role",
-      "Position",
+      "Assigned Position",
+      "Status",
       "Applied Date",
       "Bio",
     ];
 
     const escapeCSV = (val: string | null | undefined | number) => {
       if (val === null || val === undefined) return '""';
-      const str = String(val).replace(/"/g, '""');
-      return `"${str}"`;
+      let str = String(val);
+      // Protect against spreadsheet formula injection: if value starts with =, +, -, @, prepend single quote
+      if (/^[=+\-@]/.test(str)) {
+        str = "'" + str;
+      }
+      const escaped = str.replace(/"/g, '""');
+      return `"${escaped}"`;
     };
 
     const rows = filteredApplications.map((app) => {
       const linked = leaders.find((l) => l.id === app.leaderId);
+      const reqPos =
+        app.requestedPosition && app.requestedPosition > 0
+          ? `Position #${app.requestedPosition}`
+          : "Flexible / Any";
       return [
         app.id,
         escapeCSV(app.name),
         escapeCSV(app.email),
         escapeCSV(app.whatsapp),
+        escapeCSV(app.instagramUsername ? `@${app.instagramUsername}` : ""),
+        escapeCSV(app.requestedRole || "Not specified"),
+        escapeCSV(reqPos),
+        escapeCSV(linked ? linked.role : "Unassigned / Waiting List"),
+        escapeCSV(linked ? `Slot #${linked.position}` : ""),
         escapeCSV(app.status),
-        escapeCSV(linked ? linked.role : "None"),
-        escapeCSV(linked ? linked.position : ""),
         escapeCSV(new Date(app.createdAt).toISOString()),
         escapeCSV(app.bio || ""),
       ].join(",");
@@ -388,13 +546,24 @@ export default function AdminPage() {
       list = list.filter((a) => a.status === statusFilter);
     }
 
+    if (requestedRoleFilter !== "all") {
+      list = list.filter((a) => a.requestedRole === requestedRoleFilter);
+    }
+
+    if (assignedFilter === "assigned") {
+      list = list.filter((a) => a.leaderId !== null && a.leaderId !== undefined);
+    } else if (assignedFilter === "unassigned") {
+      list = list.filter((a) => !a.leaderId);
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase().trim();
       list = list.filter(
         (a) =>
           a.name.toLowerCase().includes(q) ||
           a.email.toLowerCase().includes(q) ||
-          a.whatsapp.toLowerCase().includes(q)
+          a.whatsapp.toLowerCase().includes(q) ||
+          (a.instagramUsername && a.instagramUsername.toLowerCase().includes(q))
       );
     }
 
@@ -412,7 +581,7 @@ export default function AdminPage() {
     });
 
     return list;
-  }, [applications, statusFilter, searchQuery, sortBy]);
+  }, [applications, statusFilter, requestedRoleFilter, assignedFilter, searchQuery, sortBy]);
 
   // Login View
   if (!authenticated) {
@@ -448,16 +617,17 @@ export default function AdminPage() {
                   className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
                 />
               </div>
-              {loginError && <p role="alert" className="text-sm text-red-600 font-medium">{loginError}</p>}
-              {loading && <p className="text-xs text-muted-foreground">Checking authentication session…</p>}
-              <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={loggingIn || !adminPassword}>
-                {loggingIn ? "Signing in…" : "Sign In to Dashboard"}
+
+              {loginError && <p className="text-xs text-red-600 font-medium">{loginError}</p>}
+
+              <Button
+                type="submit"
+                disabled={loggingIn || !adminPassword}
+                className="w-full text-black hover:brightness-105"
+                style={{ backgroundImage: "linear-gradient(135deg,#D7C4F3,#A7D8FF)" }}
+              >
+                {loggingIn ? "Verifying..." : "Sign In to Admin Portal"}
               </Button>
-              <div className="text-center pt-2">
-                <Link href="/" className="text-sm text-gray-600 hover:text-black underline underline-offset-4">
-                  ← Back to Home
-                </Link>
-              </div>
             </form>
           </CardContent>
         </Card>
@@ -465,87 +635,57 @@ export default function AdminPage() {
     );
   }
 
-  // Authenticated Admin Dashboard
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 text-[#333333]">
-      {/* Sticky Header */}
-      <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-white/80 bg-white/80 border-b border-white/40 shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="font-extrabold tracking-wide text-lg sm:text-xl" style={{ fontFamily: "Cinzel, serif" }}>
-              <span className="glow-text-gold">MEP</span> <span className="glow-text-blue">2027</span>
-              <span className="ml-2 text-xs font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200 uppercase tracking-wider">
-                Admin
-              </span>
-            </Link>
-
-            {/* Mobile Actions */}
-            <div className="flex sm:hidden items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleLogout} className="text-xs h-7">
-                Sign Out
-              </Button>
-            </div>
-          </div>
-
-          {/* Navigation View Switcher */}
-          <div className="flex items-center gap-1.5 p-1 bg-gray-200/70 rounded-xl backdrop-blur-sm self-center sm:self-auto">
-            <button
-              onClick={() => setAdminView("dashboard")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition ${
-                adminView === "dashboard"
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-600 hover:text-black"
-              }`}
-            >
-              <LayoutDashboard size={14} />
-              <span>Applications & Slots ({applications.length})</span>
-            </button>
-
-            <button
-              onClick={() => setAdminView("content")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition relative ${
-                adminView === "content"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-gray-600 hover:text-black"
-              }`}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-purple-50/40 text-gray-900">
+      {/* Top Navigation Bar */}
+      <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-white/60 shadow-sm">
+        <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="text-xs font-semibold px-2.5 py-1 rounded-md bg-gray-100 hover:bg-gray-200 transition text-gray-700 flex items-center gap-1.5"
             >
               <Globe size={14} />
-              <span>Website Content</span>
-              {isContentDirty && (
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse ml-0.5" />
-              )}
-            </button>
+              View Site
+            </Link>
+            <span className="text-gray-300">|</span>
+            <span className="font-bold text-sm tracking-wide text-gray-900" style={{ fontFamily: "Cinzel, serif" }}>
+              MEP 2027 Admin Control Center
+            </span>
           </div>
 
-          {/* Desktop Right Utilities */}
-          <div className="hidden sm:flex items-center gap-2 sm:gap-3">
-            <Badge className="bg-amber-100 text-amber-900 border border-amber-300">
-              {filledSlots}/6 Slots Filled
-            </Badge>
-            {adminView === "dashboard" && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-gray-300 bg-white/70 hover:bg-white text-xs sm:text-sm"
-                onClick={exportToCSV}
+          <div className="flex items-center gap-2">
+            {/* Nav Switcher: Dashboard vs Content Manager */}
+            <div className="flex items-center bg-gray-100/80 p-0.5 rounded-lg border border-gray-200 text-xs">
+              <button
+                type="button"
+                onClick={() => setAdminView("dashboard")}
+                className={`px-3 py-1 rounded-md font-medium transition flex items-center gap-1.5 ${
+                  adminView === "dashboard"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
               >
-                <Download size={14} className="mr-1 sm:mr-1.5" />
-                Export CSV
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              className="border-gray-300 bg-white/70 hover:bg-white text-xs sm:text-sm"
-              onClick={handleLogout}
-            >
-              Sign Out
+                <LayoutDashboard size={14} />
+                Applications & Leaders
+              </button>
+              <button
+                type="button"
+                onClick={() => setAdminView("content")}
+                className={`px-3 py-1 rounded-md font-medium transition flex items-center gap-1.5 ${
+                  adminView === "content"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                <Globe size={14} />
+                Website Content CMS
+              </button>
+            </div>
+
+            <Button variant="ghost" size="sm" onClick={handleLogout} className="text-xs text-rose-700 hover:bg-rose-50">
+              Logout
             </Button>
-            <Link href="/">
-              <Button size="sm" variant="ghost" className="text-xs sm:text-sm">
-                View Site
-              </Button>
-            </Link>
           </div>
         </div>
       </header>
@@ -581,16 +721,28 @@ export default function AdminPage() {
                   Live statistics, leader allocation, and applicant review pipeline.
                 </p>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={fetchData}
-                disabled={loading}
-                className="self-start sm:self-auto bg-white/60 hover:bg-white border-gray-300"
-              >
-                <RotateCcw size={14} className={`mr-1.5 ${loading ? "animate-spin" : ""}`} />
-                Refresh Data
-              </Button>
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportToCSV}
+                  disabled={applications.length === 0}
+                  className="bg-white/70 hover:bg-white border-gray-300 text-gray-800"
+                >
+                  <Download size={14} className="mr-1.5" />
+                  Export CSV ({filteredApplications.length})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchData}
+                  disabled={loading}
+                  className="bg-white/70 hover:bg-white border-gray-300"
+                >
+                  <RotateCcw size={14} className={`mr-1.5 ${loading ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
+              </div>
             </div>
 
             {/* 6 Real Database Stats Cards */}
@@ -662,7 +814,7 @@ export default function AdminPage() {
                   </p>
                 </div>
                 <div className="text-xs text-gray-500">
-                  Click &quot;Reset Slot&quot; to reopen any slot for new applications.
+                  Click &quot;Reset Slot&quot; to reopen any slot and return occupant to waiting list.
                 </div>
               </CardHeader>
               <CardContent className="p-4 sm:p-6">
@@ -670,6 +822,8 @@ export default function AdminPage() {
                   {leaders.map((leader) => {
                     const isLeader = leader.position <= 3;
                     const isFilled = leader.status === "filled";
+                    const assignedApp = applications.find((a) => a.leaderId === leader.id);
+
                     return (
                       <div
                         key={leader.id}
@@ -716,7 +870,22 @@ export default function AdminPage() {
                             </div>
 
                             {isFilled && (
-                              <div className="mt-3 pt-2 border-t border-emerald-200/60 flex justify-end">
+                              <div className="mt-3 pt-2 border-t border-emerald-200/60 flex items-center justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 px-2.5 text-xs text-indigo-700 hover:text-indigo-800 hover:bg-indigo-50 border-indigo-200 bg-white"
+                                  onClick={() => {
+                                    if (assignedApp) {
+                                      openReassignModal(assignedApp);
+                                    } else {
+                                      toast.info(`No application record currently linked to Slot #${leader.position}`);
+                                    }
+                                  }}
+                                >
+                                  <ArrowRightLeft size={12} className="mr-1" />
+                                  Reassign
+                                </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -739,14 +908,14 @@ export default function AdminPage() {
 
             {/* Applications Management Section */}
             <Card className="bg-white/70 border-white/60 backdrop-blur-md shadow-sm">
-              <CardHeader className="pb-4 border-b border-gray-100">
+              <CardHeader className="pb-4 border-b border-gray-100 space-y-4">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
                     <CardTitle className="text-xl font-bold" style={{ fontFamily: "Cinzel, serif" }}>
                       Submitted Applications ({filteredApplications.length})
                     </CardTitle>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Search, review profile photos, approve or reject applications, and manage submissions.
+                      Review preferences, Instagram handles, assign open seats, and manage approvals.
                     </p>
                   </div>
 
@@ -776,13 +945,54 @@ export default function AdminPage() {
                   </div>
                 </div>
 
+                {/* Second Filter Row: Role Preference & Assignment Status */}
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-gray-100 text-xs">
+                  <span className="text-gray-500 font-medium">Role Preference:</span>
+                  {(["all", "Leader", "Co-Leader"] as const).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setRequestedRoleFilter(r)}
+                      className={`px-2.5 py-1 rounded-md transition font-medium ${
+                        requestedRoleFilter === r
+                          ? "bg-blue-600 text-white shadow-xs"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      {r === "all" ? "All Roles" : r === "Leader" ? "Squad Leader" : "Squad Co-Leader"}
+                    </button>
+                  ))}
+
+                  <span className="text-gray-300 mx-1">|</span>
+
+                  <span className="text-gray-500 font-medium">Seat Assignment:</span>
+                  {(["all", "assigned", "unassigned"] as const).map((a) => (
+                    <button
+                      key={a}
+                      type="button"
+                      onClick={() => setAssignedFilter(a)}
+                      className={`px-2.5 py-1 rounded-md transition font-medium ${
+                        assignedFilter === a
+                          ? "bg-indigo-600 text-white shadow-xs"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                      }`}
+                    >
+                      {a === "all"
+                        ? "All Records"
+                        : a === "assigned"
+                        ? "Assigned Only"
+                        : "Unassigned / Waiting List"}
+                    </button>
+                  ))}
+                </div>
+
                 {/* Search and Sort Toolbar */}
-                <div className="mt-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                   <div className="relative flex-1">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
                       type="text"
-                      placeholder="Search applicants by name, email, or WhatsApp..."
+                      placeholder="Search applicants by name, email, WhatsApp, or Instagram..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="w-full rounded-md border border-gray-300 bg-white pl-9 pr-8 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500 shadow-sm"
@@ -823,9 +1033,9 @@ export default function AdminPage() {
                     <FileText size={36} className="mx-auto text-gray-400 mb-2" />
                     <p className="text-base font-semibold text-gray-700">No applications found</p>
                     <p className="text-xs text-gray-500 mt-1 max-w-sm mx-auto">
-                      {searchQuery || statusFilter !== "all"
-                        ? "Try adjusting your search query or status filter to see other submissions."
-                        : "No applications have been submitted to the database yet."}
+                      {searchQuery || statusFilter !== "all" || requestedRoleFilter !== "all" || assignedFilter !== "all"
+                        ? "Try adjusting your search query or filters to view other submissions."
+                        : "No applications have been recorded yet."}
                     </p>
                   </div>
                 ) : (
@@ -833,6 +1043,7 @@ export default function AdminPage() {
                     {filteredApplications.map((app) => {
                       const linkedLeader = leaders.find((l) => l.id === app.leaderId);
                       const isUpdating = actionLoadingId === app.id;
+                      const hasSeat = !!app.leaderId;
 
                       return (
                         <div
@@ -861,9 +1072,23 @@ export default function AdminPage() {
                               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <h3 className="font-bold text-lg text-gray-900">{app.name}</h3>
-                                  {linkedLeader && (
-                                    <Badge className="bg-amber-100 text-amber-900 border border-amber-300 text-xs">
-                                      {linkedLeader.role} • Slot #{linkedLeader.position}
+
+                                  {/* Preference Badge */}
+                                  <Badge variant="outline" className="text-xs bg-slate-50 text-slate-700 border-slate-300">
+                                    Preference: {app.requestedRole || "Flexible"} •{" "}
+                                    {app.requestedPosition && app.requestedPosition > 0
+                                      ? `Slot #${app.requestedPosition}`
+                                      : "Any Slot"}
+                                  </Badge>
+
+                                  {/* Actual Assignment Badge */}
+                                  {linkedLeader ? (
+                                    <Badge className="bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-semibold">
+                                      Assigned: {linkedLeader.role} • Slot #{linkedLeader.position}
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 text-xs">
+                                      Unassigned / Waiting List
                                     </Badge>
                                   )}
                                 </div>
@@ -884,7 +1109,7 @@ export default function AdminPage() {
                               </div>
 
                               {/* Contact Info Grid */}
-                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-1 gap-x-4 text-xs sm:text-sm text-gray-600 mb-3">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-y-1 gap-x-4 text-xs sm:text-sm text-gray-600 mb-3">
                                 <div className="flex items-center gap-1.5 truncate">
                                   <Mail size={14} className="text-gray-400 flex-shrink-0" />
                                   <a
@@ -907,6 +1132,25 @@ export default function AdminPage() {
                                     <ExternalLink size={10} />
                                   </a>
                                 </div>
+
+                                {app.instagramUsername ? (
+                                  <div className="flex items-center gap-1.5 truncate">
+                                    <Instagram size={14} className="text-pink-600 flex-shrink-0" />
+                                    <a
+                                      href={`https://instagram.com/${app.instagramUsername}`}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="hover:text-pink-600 hover:underline truncate font-mono text-xs"
+                                    >
+                                      @{app.instagramUsername}
+                                    </a>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 text-gray-400 text-xs">
+                                    <Instagram size={14} className="flex-shrink-0" />
+                                    <span>No Instagram handle</span>
+                                  </div>
+                                )}
 
                                 <div className="flex items-center gap-1.5 text-gray-500">
                                   <Calendar size={14} className="text-gray-400 flex-shrink-0" />
@@ -937,23 +1181,38 @@ export default function AdminPage() {
                                   onClick={() => setSelectedApp(app)}
                                 >
                                   <FileText size={13} className="mr-1" />
-                                  View Full Details
+                                  View Details
                                 </Button>
 
-                                <div className="flex items-center gap-1.5 ml-auto">
-                                  {app.status !== "approved" && (
+                                <div className="flex flex-wrap items-center gap-1.5 ml-auto">
+                                  {/* CORE WORKFLOW ACTION 1: Assign & Approve (for unassigned applicants) */}
+                                  {!hasSeat && (
                                     <Button
-                                      variant="outline"
                                       size="sm"
                                       disabled={isUpdating}
-                                      className="h-8 px-2.5 text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50 bg-white"
-                                      onClick={() => handleStatusUpdate(app.id, "approved")}
+                                      className="h-8 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                                      onClick={() => openAssignModal(app)}
                                     >
-                                      <CheckCircle size={13} className="mr-1" />
-                                      Approve
+                                      <UserCheck size={13} className="mr-1.5" />
+                                      Assign & Approve
                                     </Button>
                                   )}
 
+                                  {/* CORE WORKFLOW ACTION 2: Move / Reassign (for assigned applicants) */}
+                                  {hasSeat && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      disabled={isUpdating}
+                                      className="h-8 px-3 text-xs text-indigo-700 border-indigo-300 hover:bg-indigo-50 bg-white font-medium shadow-xs"
+                                      onClick={() => openReassignModal(app)}
+                                    >
+                                      <ArrowRightLeft size={13} className="mr-1.5" />
+                                      Move / Reassign
+                                    </Button>
+                                  )}
+
+                                  {/* Standard Status Controls */}
                                   {app.status !== "rejected" && (
                                     <Button
                                       variant="outline"
@@ -976,7 +1235,7 @@ export default function AdminPage() {
                                       onClick={() => handleStatusUpdate(app.id, "pending")}
                                     >
                                       <Clock size={13} className="mr-1" />
-                                      Mark Pending
+                                      Pending
                                     </Button>
                                   )}
 
@@ -1004,6 +1263,313 @@ export default function AdminPage() {
           </>
         )}
       </main>
+
+      {/* Modal: Assign & Approve for Unassigned Applications */}
+      {assigningApp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <Card className="w-full max-w-xl bg-white shadow-2xl border-gray-200 max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-center justify-between pb-3 border-b">
+              <div>
+                <CardTitle className="text-lg font-bold text-gray-900" style={{ fontFamily: "Cinzel, serif" }}>
+                  Assign Seat & Approve Application
+                </CardTitle>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Allocate an available public seat to confirm {assigningApp.name}&apos;s placement.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 rounded-full"
+                onClick={() => setAssigningApp(null)}
+              >
+                <X size={18} />
+              </Button>
+            </CardHeader>
+            <CardContent className="p-6 space-y-5">
+              {/* Applicant Preference Summary */}
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-medium">Applicant:</span>
+                  <span className="font-semibold text-gray-900">{assigningApp.name}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-medium">Requested Role:</span>
+                  <Badge variant="outline" className="font-semibold text-blue-800 bg-blue-50 border-blue-200">
+                    {assigningApp.requestedRole === "Leader" ? "Squad Leader" : "Squad Co-Leader"}
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-medium">Preferred Seat:</span>
+                  <span className="font-semibold text-gray-900">
+                    {assigningApp.requestedPosition && assigningApp.requestedPosition > 0
+                      ? `Position #${assigningApp.requestedPosition}`
+                      : "Any Available Position (Flexible)"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Occupied Preferred Slot Notice */}
+              {assigningApp.requestedPosition &&
+                assigningApp.requestedPosition > 0 &&
+                leaders.find((l) => l.position === assigningApp.requestedPosition)?.status === "filled" && (
+                  <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2">
+                    <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <strong>Preferred Seat (Slot #{assigningApp.requestedPosition}) is Occupied.</strong>
+                      <p className="mt-0.5 text-2xs text-amber-700">
+                        Occupied by {leaders.find((l) => l.position === assigningApp.requestedPosition)?.name || "another applicant"}. Please select another open seat below or leave unassigned on waiting list.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+              {/* Seat Selection */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block mb-2">
+                  Select Seat to Assign:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {leaders.map((leader) => {
+                    const isOccupied = leader.status === "filled";
+                    const isSelected = selectedAssignSeat === leader.id;
+                    const isPreferred = assigningApp.requestedPosition === leader.position;
+
+                    return (
+                      <div
+                        key={leader.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (!isOccupied) setSelectedAssignSeat(leader.id);
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                          isOccupied
+                            ? "border-gray-200 bg-gray-100/70 opacity-60 cursor-not-allowed"
+                            : isSelected
+                            ? "border-emerald-600 bg-emerald-50 ring-2 ring-emerald-300 shadow-xs cursor-pointer"
+                            : "border-gray-200 bg-white hover:bg-gray-50 cursor-pointer"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-bold text-gray-900">
+                            Slot #{leader.position}
+                          </span>
+                          <span
+                            className={`text-3xs uppercase font-bold px-1.5 py-0.5 rounded-full ${
+                              isOccupied
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-emerald-100 text-emerald-800"
+                            }`}
+                          >
+                            {isOccupied ? "Occupied" : "Open"}
+                          </span>
+                        </div>
+                        <div className="text-xs font-medium text-gray-700 flex items-center gap-1">
+                          {leader.role === "Leader" ? (
+                            <Crown size={12} className="text-amber-600" />
+                          ) : (
+                            <Sparkles size={12} className="text-indigo-600" />
+                          )}
+                          {leader.role}
+                        </div>
+                        {isOccupied && (
+                          <div className="text-3xs text-gray-500 mt-1 truncate">
+                            Occupant: {leader.name || "Assigned"}
+                          </div>
+                        )}
+                        {isPreferred && (
+                          <div className="mt-1 text-3xs font-semibold text-blue-700">
+                            ★ Applicant&apos;s Preference
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="pt-3 border-t flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setAssigningApp(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!selectedAssignSeat || actionLoadingId === assigningApp.id}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm"
+                  onClick={confirmAssignAndApprove}
+                >
+                  <CheckCircle size={14} className="mr-1.5" />
+                  Confirm Assignment & Approve
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Modal: Move / Reassign for Assigned Applicants */}
+      {reassigningApp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <Card className="w-full max-w-xl bg-white shadow-2xl border-gray-200 max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-center justify-between pb-3 border-b">
+              <div>
+                <CardTitle className="text-lg font-bold text-gray-900" style={{ fontFamily: "Cinzel, serif" }}>
+                  Move / Reassign Leadership Seat
+                </CardTitle>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Change {reassigningApp.name}&apos;s assigned seat across Squad Leader and Co-Leader roles.
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 rounded-full"
+                onClick={() => setReassigningApp(null)}
+              >
+                <X size={18} />
+              </Button>
+            </CardHeader>
+            <CardContent className="p-6 space-y-5">
+              {/* Current Assignment Details */}
+              <div className="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200 text-xs space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-medium">Applicant:</span>
+                  <span className="font-semibold text-gray-900">{reassigningApp.name}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-medium">Current Seat:</span>
+                  <Badge className="bg-indigo-100 text-indigo-900 border-indigo-300">
+                    Slot #{reassigningApp.leaderId} ({leaders.find((l) => l.id === reassigningApp.leaderId)?.role})
+                  </Badge>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-500 font-medium">Original Preference:</span>
+                  <span className="font-semibold text-gray-800">
+                    {reassigningApp.requestedRole || "Flexible"} •{" "}
+                    {reassigningApp.requestedPosition && reassigningApp.requestedPosition > 0
+                      ? `Position #${reassigningApp.requestedPosition}`
+                      : "Flexible"}
+                  </span>
+                </div>
+              </div>
+
+              {/* Destination Seat Choice */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-gray-700 block mb-2">
+                  Select Destination Seat:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {leaders.map((leader) => {
+                    const isCurrent = reassigningApp.leaderId === leader.id;
+                    const isOccupiedByOther = leader.status === "filled" && !isCurrent;
+                    const isSelected = selectedReassignSeat === leader.id;
+
+                    return (
+                      <div
+                        key={leader.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          if (!isOccupiedByOther) {
+                            setSelectedReassignSeat(leader.id);
+                            // Check if cross role move
+                            const currentSlot = leaders.find((l) => l.id === reassigningApp.leaderId);
+                            if (currentSlot && currentSlot.role !== leader.role) {
+                              setConfirmRoleChange(true);
+                            } else {
+                              setConfirmRoleChange(false);
+                            }
+                          }
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                          isOccupiedByOther
+                            ? "border-gray-200 bg-gray-100/70 opacity-60 cursor-not-allowed"
+                            : isSelected
+                            ? "border-indigo-600 bg-indigo-50 ring-2 ring-indigo-300 shadow-xs cursor-pointer"
+                            : "border-gray-200 bg-white hover:bg-gray-50 cursor-pointer"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-bold text-gray-900">
+                            Slot #{leader.position}
+                          </span>
+                          <span
+                            className={`text-3xs uppercase font-bold px-1.5 py-0.5 rounded-full ${
+                              isCurrent
+                                ? "bg-blue-100 text-blue-800 font-bold"
+                                : isOccupiedByOther
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-emerald-100 text-emerald-800"
+                            }`}
+                          >
+                            {isCurrent ? "Current" : isOccupiedByOther ? "Occupied" : "Available"}
+                          </span>
+                        </div>
+                        <div className="text-xs font-medium text-gray-700 flex items-center gap-1">
+                          {leader.role === "Leader" ? (
+                            <Crown size={12} className="text-amber-600" />
+                          ) : (
+                            <Sparkles size={12} className="text-indigo-600" />
+                          )}
+                          {leader.role}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Option: Move back to waiting list (unassign) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedReassignSeat(null);
+                  setConfirmRoleChange(false);
+                }}
+                className={`w-full py-2.5 px-3 rounded-xl border text-xs font-medium transition-all flex items-center justify-between ${
+                  selectedReassignSeat === null
+                    ? "border-amber-500 bg-amber-50 text-amber-900 ring-2 ring-amber-300 font-semibold"
+                    : "border-gray-200 bg-white hover:bg-gray-50 text-gray-700"
+                }`}
+              >
+                <span>Unassign & Move to Waiting List (Pending Review)</span>
+                <span className="text-2xs text-amber-700">Frees Slot #{reassigningApp.leaderId}</span>
+              </button>
+
+              {/* Cross-Role Transition Warning */}
+              {confirmRoleChange && selectedReassignSeat && (
+                <div className="p-3 rounded-lg bg-indigo-50 border border-indigo-200 text-xs text-indigo-900 flex items-start gap-2">
+                  <AlertTriangle size={16} className="text-indigo-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong>Cross-Role Transition:</strong>
+                    <p className="mt-0.5 text-2xs text-indigo-700">
+                      Moving applicant from {leaders.find((l) => l.id === reassigningApp.leaderId)?.role} to {leaders.find((l) => l.id === selectedReassignSeat)?.role}. Original applicant preference is preserved.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="pt-3 border-t flex justify-end gap-2">
+                <Button variant="outline" size="sm" onClick={() => setReassigningApp(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={actionLoadingId === reassigningApp.id}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-sm"
+                  onClick={confirmReassign}
+                >
+                  <ArrowRightLeft size={14} className="mr-1.5" />
+                  Confirm Move
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Modal: Full Application Detail View */}
       {selectedApp && (
@@ -1073,11 +1639,49 @@ export default function AdminPage() {
                         {selectedApp.whatsapp}
                       </a>
                     </p>
+                    {selectedApp.instagramUsername && (
+                      <p className="flex items-center justify-center sm:justify-start gap-2">
+                        <Instagram size={15} className="text-pink-600" />
+                        <a
+                          href={`https://instagram.com/${selectedApp.instagramUsername}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-pink-600 hover:underline font-mono"
+                        >
+                          @{selectedApp.instagramUsername}
+                        </a>
+                      </p>
+                    )}
                     <p className="flex items-center justify-center sm:justify-start gap-2 text-xs text-gray-500">
                       <Calendar size={14} className="text-gray-400" />
                       Applied: {new Date(selectedApp.createdAt).toLocaleString()}
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* Preference vs Assignment Box */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                <div>
+                  <span className="text-gray-500 block font-medium">Applicant Preference:</span>
+                  <span className="font-semibold text-gray-900 mt-0.5 block">
+                    {selectedApp.requestedRole || "Not specified"} •{" "}
+                    {selectedApp.requestedPosition && selectedApp.requestedPosition > 0
+                      ? `Position #${selectedApp.requestedPosition}`
+                      : "Flexible / Any Seat"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500 block font-medium">Actual Confirmed Assignment:</span>
+                  {selectedApp.leaderId ? (
+                    <span className="font-semibold text-emerald-800 mt-0.5 block">
+                      Slot #{selectedApp.leaderId} ({leaders.find((l) => l.id === selectedApp.leaderId)?.role})
+                    </span>
+                  ) : (
+                    <span className="font-semibold text-amber-700 mt-0.5 block">
+                      Unassigned / Waiting List
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1091,17 +1695,37 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Status Action Buttons */}
+              {/* Status & Assignment Action Buttons */}
               <div className="pt-4 border-t flex flex-wrap items-center justify-end gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleStatusUpdate(selectedApp.id, "approved")}
-                  className="text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-                >
-                  <CheckCircle size={14} className="mr-1" />
-                  Mark Approved
-                </Button>
+                {!selectedApp.leaderId ? (
+                  <Button
+                    size="sm"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                    onClick={() => {
+                      const appToAssign = selectedApp;
+                      setSelectedApp(null);
+                      openAssignModal(appToAssign);
+                    }}
+                  >
+                    <UserCheck size={14} className="mr-1.5" />
+                    Assign & Approve
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-indigo-700 border-indigo-300 hover:bg-indigo-50"
+                    onClick={() => {
+                      const appToReassign = selectedApp;
+                      setSelectedApp(null);
+                      openReassignModal(appToReassign);
+                    }}
+                  >
+                    <ArrowRightLeft size={14} className="mr-1.5" />
+                    Move / Reassign
+                  </Button>
+                )}
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -1111,6 +1735,7 @@ export default function AdminPage() {
                   <XCircle size={14} className="mr-1" />
                   Mark Rejected
                 </Button>
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -1120,6 +1745,7 @@ export default function AdminPage() {
                   <Clock size={14} className="mr-1" />
                   Mark Pending
                 </Button>
+
                 <Button
                   variant="destructive"
                   size="sm"
@@ -1130,7 +1756,7 @@ export default function AdminPage() {
                   }}
                 >
                   <Trash2 size={14} className="mr-1" />
-                  Delete Application
+                  Delete
                 </Button>
               </div>
             </CardContent>
@@ -1210,7 +1836,7 @@ export default function AdminPage() {
                 ) back to open status?
               </p>
               <p className="text-xs text-gray-500">
-                Current occupant ({resettingSlot.name || "Assigned"}) will be cleared and the slot will immediately become available for next submissions.
+                Current occupant ({resettingSlot.name || "Assigned"}) will be cleared and their application returned to the pending waiting list.
               </p>
               <div className="pt-2 flex justify-end gap-2">
                 <Button variant="outline" size="sm" onClick={() => setResettingSlot(null)}>

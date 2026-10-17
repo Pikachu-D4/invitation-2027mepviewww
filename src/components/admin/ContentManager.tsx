@@ -224,7 +224,7 @@ export function ContentManager({
                   About MEP Section Settings
                 </CardTitle>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Customize the manifesto, squad composition, leader responsibilities, and callouts.
+                  Customize the manifesto, vision cards, descriptive paragraphs, and highlight callouts.
                 </p>
               </div>
 

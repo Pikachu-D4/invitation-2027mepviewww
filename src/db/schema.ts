@@ -22,6 +22,9 @@ export const applications = sqliteTable('applications', {
   profileImage: text('profile_image').notNull(),
   status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
   leaderId: integer('leader_id').references(() => leaders.id),
+  requestedRole: text('requested_role'), // 'Leader' | 'Co-Leader'
+  requestedPosition: integer('requested_position'), // 1-6, or 0/null for any
+  instagramUsername: text('instagram_username'),
   adminNotes: text('admin_notes'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),

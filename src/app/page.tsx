@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Mail, MessageSquare, Send, Menu, X, Bell, ExternalLink, Sparkles, Youtube, Check, Phone } from "lucide-react";
+import { Mail, MessageSquare, Send, Menu, X, Bell, ExternalLink, Sparkles, Youtube, Check, Phone, Instagram, Crown, ShieldCheck, AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_SITE_CONTENT, type SiteContent } from "@/lib/content";
 
@@ -42,8 +42,17 @@ export default function Home() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [instagram, setInstagram] = useState("");
+  const [requestedRole, setRequestedRole] = useState<"Leader" | "Co-Leader" | "">("");
+  const [requestedPosition, setRequestedPosition] = useState<number>(0);
   const [bio, setBio] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submissionSuccess, setSubmissionSuccess] = useState<{
+    reference: string;
+    requestedRole: string;
+    requestedPosition: number;
+    status: string;
+  } | null>(null);
   // New: profile image state
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
@@ -216,10 +225,28 @@ export default function Home() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name || !email || !whatsapp) {
-      toast.error('Please fill in all required fields');
+    if (!name.trim() || !email.trim() || !whatsapp.trim()) {
+      toast.error('Please fill in all required fields (Name, Email, WhatsApp).');
       return;
     }
+
+    if (!requestedRole) {
+      toast.error('Please choose your preferred role: Squad Leader or Squad Co-Leader');
+      return;
+    }
+
+    const cleanedInsta = instagram.trim().replace(/^@+/, "");
+    if (cleanedInsta) {
+      if (cleanedInsta.length > 30) {
+        toast.error('Instagram username must not exceed 30 characters.');
+        return;
+      }
+      if (!/^[A-Za-z0-9._]+$/.test(cleanedInsta)) {
+        toast.error('Instagram username contains invalid characters. Use letters, numbers, periods, and underscores only.');
+        return;
+      }
+    }
+
     if (!profileImageFile) {
       setImageError('Profile picture is required before submission.');
       return;
@@ -231,45 +258,53 @@ export default function Home() {
       formData.append('name', name);
       formData.append('email', email);
       formData.append('whatsapp', whatsapp);
+      if (cleanedInsta) formData.append('instagramUsername', cleanedInsta);
+      formData.append('requestedRole', requestedRole);
+      formData.append('requestedPosition', String(requestedPosition));
       if (bio) formData.append('bio', bio);
       formData.append('profileImage', profileImageFile);
 
       const response = await fetch('/api/applications', {
         method: 'POST',
-        body: formData
+        body: formData,
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        if (data.code === 'NO_OPEN_SLOTS') {
-          toast.error('All leader slots are filled. Thank you for your interest!');
-        } else if (data.code === 'MISSING_IMAGE') {
+        if (data.code === 'MISSING_IMAGE') {
           setImageError('Profile picture is required before submission.');
         } else if (data.code === 'INVALID_IMAGE_TYPE') {
-          setImageError('Please upload a JPG or PNG image.');
+          setImageError('Please upload a JPG, PNG, or WEBP image.');
         } else if (data.code === 'IMAGE_TOO_LARGE') {
-          setImageError('Image must be smaller than 2 MB.');
-        } else if (data.code === 'UNSUPPORTED_MEDIA_TYPE') {
-          toast.error('Upload failed: unsupported format.');
+          setImageError('Image must be smaller than 5 MB.');
         } else {
           toast.error(data.error || 'Failed to submit application');
         }
         return;
       }
 
-      // Success!
+      // Success! Decoupled workflow: application is saved as pending review
+      setSubmissionSuccess({
+        reference: data.reference || `MEP2027-${data.applicationId}`,
+        requestedRole: data.requestedRole || requestedRole,
+        requestedPosition: data.requestedPosition ?? requestedPosition,
+        status: data.status || 'pending',
+      });
+
       toast.success('Application submitted successfully!');
       setName("");
       setEmail("");
       setWhatsapp("");
+      setInstagram("");
+      setRequestedRole("");
+      setRequestedPosition(0);
       setBio("");
       setProfileImageFile(null);
       if (profilePreview) URL.revokeObjectURL(profilePreview);
       setProfilePreview(null);
       setImageError(null);
 
-      // Refresh leaders to show the new filled slot
       await fetchLeaders();
     } catch (error) {
       console.error('Error submitting application:', error);
@@ -316,17 +351,30 @@ export default function Home() {
             name={name}
             email={email}
             whatsapp={whatsapp}
+            instagram={instagram}
+            requestedRole={requestedRole}
+            requestedPosition={requestedPosition}
             bio={bio}
             submitting={submitting}
+            leaders={leaders}
+            submissionSuccess={submissionSuccess}
+            onResetSuccess={() => setSubmissionSuccess(null)}
             onName={setName}
             onEmail={setEmail}
             onWhatsapp={setWhatsapp}
+            onInstagram={setInstagram}
+            onRequestedRole={(role) => {
+              setRequestedRole(role);
+              setRequestedPosition(0); // Reset position to flexible when role changes
+            }}
+            onRequestedPosition={setRequestedPosition}
             onBio={setBio}
             onSubmit={handleSubmit}
-            progress={filled / total * 100}
+            progress={(filled / total) * 100}
             profilePreview={profilePreview}
             imageError={imageError}
-            onImageChange={handleImageChange} />
+            onImageChange={handleImageChange}
+          />
 
         </SectionWithParallax>
         <SectionWithParallax>
@@ -1285,81 +1333,469 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
 }
 
 function ApplicationForm(props: {
-  name: string;email: string;whatsapp: string;bio: string;submitting: boolean;
-  onName: (v: string) => void;onEmail: (v: string) => void;onWhatsapp: (v: string) => void;onBio: (v: string) => void;
-  onSubmit: (e: React.FormEvent) => void;progress: number;
-  profilePreview: string | null;imageError: string | null;onImageChange: (file: File | null) => void;
+  name: string;
+  email: string;
+  whatsapp: string;
+  instagram: string;
+  requestedRole: "Leader" | "Co-Leader" | "";
+  requestedPosition: number;
+  bio: string;
+  submitting: boolean;
+  leaders: Leader[];
+  submissionSuccess: {
+    reference: string;
+    requestedRole: string;
+    requestedPosition: number;
+    status: string;
+  } | null;
+  onResetSuccess: () => void;
+  onName: (v: string) => void;
+  onEmail: (v: string) => void;
+  onWhatsapp: (v: string) => void;
+  onInstagram: (v: string) => void;
+  onRequestedRole: (role: "Leader" | "Co-Leader") => void;
+  onRequestedPosition: (pos: number) => void;
+  onBio: (v: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  progress: number;
+  profilePreview: string | null;
+  imageError: string | null;
+  onImageChange: (file: File | null) => void;
 }) {
-  const { name, email, whatsapp, bio, submitting, onName, onEmail, onWhatsapp, onBio, onSubmit, progress, profilePreview, imageError, onImageChange } = props;
+  const {
+    name,
+    email,
+    whatsapp,
+    instagram,
+    requestedRole,
+    requestedPosition,
+    bio,
+    submitting,
+    leaders,
+    submissionSuccess,
+    onResetSuccess,
+    onName,
+    onEmail,
+    onWhatsapp,
+    onInstagram,
+    onRequestedRole,
+    onRequestedPosition,
+    onBio,
+    onSubmit,
+    progress,
+    profilePreview,
+    imageError,
+    onImageChange,
+  } = props;
+
+  // Selected position details
+  const selectedLeaderSlot = requestedPosition > 0 ? leaders.find((l) => l.position === requestedPosition) : null;
+  const isSelectedSlotOccupied = selectedLeaderSlot ? selectedLeaderSlot.status === 'filled' : false;
+
   return (
     <section id="apply" className="py-16 md:py-24">
-      <div className="mx-auto max-w-6xl px-4 grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="mx-auto max-w-6xl px-4 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+        {/* Left Column: Guidelines & Progress */}
         <div>
-          <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "Cinzel, serif", color: '#333333' }}>Apply as Leader or Co-Leader</h2>
-          <p className="mt-2 text-muted-foreground" style={{ color: '#333333' }}>Tell us about your strengths and motivation. We review applications on a rolling basis and will assign you to either a Leader or Co-Leader position.</p>
-          <div className="mt-6">
-            <div className="text-sm mb-2">Slots progress</div>
+          <Badge className="mb-3 bg-white/70 text-gray-800 border-white/60 shadow-sm backdrop-blur-md">
+            MEP 2027 Leadership Application
+          </Badge>
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight" style={{ fontFamily: "Cinzel, serif", color: '#333333' }}>
+            Apply as Leader or Co-Leader
+          </h2>
+          <p className="mt-3 text-muted-foreground leading-relaxed text-sm md:text-base" style={{ color: '#444444' }}>
+            Join the executive squad steering the New Year 2027 milestone. Choose your preferred role and numbered seat. 
+            All submissions are reviewed by administrators before official seat allocations are confirmed.
+          </p>
+
+          <div className="mt-6 p-4 rounded-2xl bg-white/40 border border-white/50 backdrop-blur-md">
+            <div className="flex items-center justify-between text-sm mb-2 font-medium">
+              <span>Overall Squad Capacity</span>
+              <span>{Math.round(progress)}% Filled</span>
+            </div>
             <Progress value={progress} className="h-3" />
-            <div className="text-xs text-muted-foreground mt-1" style={{ color: '#333333' }}>{Math.round(progress)}% filled (3 Leaders + 3 Co-Leaders)</div>
+            <div className="text-xs text-muted-foreground mt-2" style={{ color: '#555555' }}>
+              6 Dedicated Positions (3 Squad Leaders + 3 Squad Co-Leaders)
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-white/30 border border-white/40 text-xs text-gray-700">
+              <ShieldCheck size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold text-gray-900 block">Separate Role Preference & Assignment:</span>
+                Selecting a seat indicates your preference. Official public slots are occupied only when approved by administrators.
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-white/30 border border-white/40 text-xs text-gray-700">
+              <Clock size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold text-gray-900 block">Rolling Waiting List:</span>
+                Even if all seats are filled, your application enters our priority waiting list for upcoming expansions or openings.
+              </div>
+            </div>
           </div>
         </div>
-        <Card className="bg-[rgba(255,255,255,0.5)] border-[rgba(255,255,255,0.3)] backdrop-blur-md">
+
+        {/* Right Column: Form or Success Confirmation Card */}
+        <Card className="bg-[rgba(255,255,255,0.6)] border-[rgba(255,255,255,0.4)] backdrop-blur-xl shadow-[0_8px_32px_0_rgba(31,38,135,0.07)]">
           <CardContent className="pt-6">
-            <form onSubmit={onSubmit} className="space-y-4">
-              <div>
-                <label className="text-sm">Full Name</label>
-                <Input value={name} onChange={(e) => onName(e.target.value)} placeholder="Your full name" required className="mt-1 bg-white/60" />
-              </div>
-              <div>
-                <label className="text-sm">Email</label>
-                <Input type="email" value={email} onChange={(e) => onEmail(e.target.value)} placeholder="you@example.com" required className="mt-1 bg-white/60" />
-              </div>
-              <div>
-                <label className="text-sm">WhatsApp Number</label>
-                <Input type="tel" value={whatsapp} onChange={(e) => onWhatsapp(e.target.value)} placeholder="e.g., +1 555 123 4567" required className="mt-1 bg-white/60" />
-              </div>
-              {/* New: Profile Picture Upload */}
-              <div>
-                <label className="text-sm block mb-1">Upload your Profile Picture (required)</label>
-                <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-full overflow-hidden border border-[rgba(0,0,0,0.08)] shadow-sm bg-white/70 flex items-center justify-center">
-                    {profilePreview ?
-                    <img src={profilePreview} alt="Preview" className="h-full w-full object-cover" /> :
-
-                    <div className="h-full w-full bg-gradient-to-br from-slate-100 to-white" />
-                    }
-                  </div>
-                  <label htmlFor="profileImage" className="flex-1 cursor-pointer rounded-2xl border border-white/60 bg-white/60 backdrop-blur-md px-4 py-3 shadow-sm hover:shadow-md transition ring-1 ring-transparent hover:ring-[rgba(167,216,255,0.5)]">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-[#333333]">{profilePreview ? 'Change image' : 'Choose JPG or PNG (max 2MB)'}</span>
-                      <Button type="button" variant="outline" className="glass-button text-[#333333]">Browse…</Button>
-                    </div>
-                    <input
-                      id="profileImage"
-                      type="file"
-                      accept="image/png,image/jpeg"
-                      className="hidden"
-                      onChange={(e) => onImageChange(e.target.files?.[0] ?? null)} />
-
-                  </label>
+            {submissionSuccess ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="text-center py-6 px-2 space-y-5"
+              >
+                <div className="mx-auto w-16 h-16 rounded-full bg-emerald-100 border-2 border-emerald-300 flex items-center justify-center text-emerald-600 shadow-md">
+                  <CheckCircle2 size={36} />
                 </div>
-                {imageError &&
-                <p className="mt-2 text-xs text-red-600">{imageError}</p>
-                }
-              </div>
-              <div>
-                <label className="text-sm">Short Bio</label>
-                <Textarea value={bio} onChange={(e) => onBio(e.target.value)} placeholder="Share highlights, goals, and what you hope to build in 2027" rows={5} className="mt-1 bg-white/60" />
-              </div>
-              <Button type="submit" disabled={submitting} className="w-full text-black hover:brightness-105" style={{ backgroundImage: 'linear-gradient(135deg,#D7C4F3,#A7D8FF)' }}>
-                {submitting ? "Submitting..." : "Submit Application"}
-              </Button>
-            </form>
+
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900" style={{ fontFamily: "Cinzel, serif" }}>
+                    Application Submitted!
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Your leadership application has been securely recorded.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-white/80 border border-emerald-200 text-left space-y-2 text-sm shadow-sm">
+                  <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                    <span className="text-gray-500 font-medium text-xs uppercase tracking-wider">Reference</span>
+                    <Badge variant="outline" className="font-mono bg-emerald-50 text-emerald-800 border-emerald-300 font-bold">
+                      {submissionSuccess.reference}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 font-medium">Requested Role:</span>
+                    <span className="font-semibold text-gray-900">
+                      {submissionSuccess.requestedRole === "Leader" ? "Squad Leader" : "Squad Co-Leader"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 font-medium">Position Preference:</span>
+                    <span className="font-semibold text-gray-900">
+                      {submissionSuccess.requestedPosition === 0
+                        ? "Any available position (Flexible)"
+                        : `Position #${submissionSuccess.requestedPosition}`}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-100">
+                    <span className="text-gray-500 font-medium">Status:</span>
+                    <Badge className="bg-amber-100 text-amber-800 border border-amber-300 capitalize text-xs">
+                      {submissionSuccess.status} Review
+                    </Badge>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-500 leading-relaxed max-w-md mx-auto">
+                  Our administration team reviews each application carefully before confirming seat assignments. 
+                  You will receive updates via WhatsApp and Email.
+                </p>
+
+                <Button
+                  onClick={onResetSuccess}
+                  variant="outline"
+                  className="w-full bg-white/80 border-gray-300 hover:bg-white text-gray-800"
+                >
+                  Submit Another Application
+                </Button>
+              </motion.div>
+            ) : (
+              <form onSubmit={onSubmit} className="space-y-4">
+                {/* Full Name */}
+                <div>
+                  <label className="text-sm font-medium text-gray-800">
+                    Full Name <span className="text-rose-500">*</span>
+                  </label>
+                  <Input
+                    value={name}
+                    onChange={(e) => onName(e.target.value)}
+                    placeholder="e.g. Alex Morgan"
+                    required
+                    maxLength={100}
+                    className="mt-1 bg-white/70 border-white/60 focus:bg-white transition"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="text-sm font-medium text-gray-800">
+                    Email Address <span className="text-rose-500">*</span>
+                  </label>
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(e) => onEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    maxLength={150}
+                    className="mt-1 bg-white/70 border-white/60 focus:bg-white transition"
+                  />
+                </div>
+
+                {/* WhatsApp */}
+                <div>
+                  <label className="text-sm font-medium text-gray-800">
+                    WhatsApp Number <span className="text-rose-500">*</span>
+                  </label>
+                  <Input
+                    type="tel"
+                    value={whatsapp}
+                    onChange={(e) => onWhatsapp(e.target.value)}
+                    placeholder="e.g. +91 98765 43210"
+                    required
+                    maxLength={30}
+                    className="mt-1 bg-white/70 border-white/60 focus:bg-white transition"
+                  />
+                </div>
+
+                {/* Instagram Username (optional) */}
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                      <Instagram size={15} className="text-pink-600" />
+                      Instagram Username (optional)
+                    </label>
+                    <span className="text-2xs text-gray-400">Handle without @</span>
+                  </div>
+                  <div className="relative mt-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-mono text-sm">
+                      @
+                    </span>
+                    <Input
+                      type="text"
+                      value={instagram}
+                      onChange={(e) => onInstagram(e.target.value.replace(/\s+/g, ''))}
+                      placeholder="yourusername"
+                      maxLength={30}
+                      className="pl-8 bg-white/70 border-white/60 focus:bg-white transition font-mono text-sm"
+                    />
+                  </div>
+                  <p className="mt-1 text-2xs text-gray-500">
+                    Used for event mentions, squad shoutouts, and team tags. Enter with or without &apos;@&apos;.
+                  </p>
+                </div>
+
+                {/* SECTION: Choose Your Preferred Role */}
+                <div className="pt-2 border-t border-gray-200/50 space-y-3">
+                  <div>
+                    <label className="text-sm font-bold text-gray-900 block" style={{ fontFamily: "Cinzel, serif" }}>
+                      Choose Your Preferred Role <span className="text-rose-500">*</span>
+                    </label>
+                    <p className="text-xs text-gray-500">
+                      Select whether you wish to apply as a Squad Leader or Squad Co-Leader.
+                    </p>
+                  </div>
+
+                  {/* Two Selectable Role Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Card 1: Squad Leader */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onRequestedRole("Leader")}
+                      onKeyDown={(e) => e.key === 'Enter' && onRequestedRole("Leader")}
+                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all duration-200 text-left ${
+                        requestedRole === "Leader"
+                          ? "border-amber-500 bg-amber-50/80 shadow-md ring-2 ring-amber-200"
+                          : "border-white/70 bg-white/50 hover:bg-white/80 hover:border-amber-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="p-2 rounded-lg bg-amber-100 text-amber-700">
+                          <Crown size={18} />
+                        </div>
+                        <Badge variant="outline" className={`text-2xs font-bold uppercase ${requestedRole === "Leader" ? "bg-amber-200 text-amber-900 border-amber-400" : "bg-white/60 text-gray-600"}`}>
+                          Positions 1–3
+                        </Badge>
+                      </div>
+                      <h4 className="font-bold text-gray-900 text-base">Squad Leader</h4>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Primary squad guidance, strategic execution, and squad vision.
+                      </p>
+                    </div>
+
+                    {/* Card 2: Squad Co-Leader */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => onRequestedRole("Co-Leader")}
+                      onKeyDown={(e) => e.key === 'Enter' && onRequestedRole("Co-Leader")}
+                      className={`cursor-pointer p-4 rounded-xl border-2 transition-all duration-200 text-left ${
+                        requestedRole === "Co-Leader"
+                          ? "border-indigo-500 bg-indigo-50/80 shadow-md ring-2 ring-indigo-200"
+                          : "border-white/70 bg-white/50 hover:bg-white/80 hover:border-indigo-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="p-2 rounded-lg bg-indigo-100 text-indigo-700">
+                          <Sparkles size={18} />
+                        </div>
+                        <Badge variant="outline" className={`text-2xs font-bold uppercase ${requestedRole === "Co-Leader" ? "bg-indigo-200 text-indigo-900 border-indigo-400" : "bg-white/60 text-gray-600"}`}>
+                          Positions 4–6
+                        </Badge>
+                      </div>
+                      <h4 className="font-bold text-gray-900 text-base">Squad Co-Leader</h4>
+                      <p className="text-xs text-gray-600 mt-1">
+                        Operational co-management, member engagement, and execution.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Position Preference Selector: displays after role is chosen */}
+                  {requestedRole && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-3.5 rounded-xl bg-white/60 border border-white/80 space-y-2.5 mt-2 shadow-inner"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-800 uppercase tracking-wide">
+                          Select Preferred Position in {requestedRole} Role:
+                        </span>
+                        <span className="text-2xs text-gray-500">Live database availability</span>
+                      </div>
+
+                      {/* Position Grid: 3 specific positions */}
+                      <div className="grid grid-cols-3 gap-2">
+                        {(requestedRole === "Leader" ? [1, 2, 3] : [4, 5, 6]).map((pos) => {
+                          const slot = leaders.find((l) => l.position === pos);
+                          const isOccupied = slot?.status === 'filled';
+                          const isSelected = requestedPosition === pos;
+
+                          return (
+                            <button
+                              key={pos}
+                              type="button"
+                              onClick={() => onRequestedPosition(pos)}
+                              className={`p-2.5 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-1 ${
+                                isSelected
+                                  ? "border-blue-600 bg-blue-50 ring-2 ring-blue-300 shadow-sm"
+                                  : "border-gray-200 bg-white/70 hover:bg-white"
+                              }`}
+                            >
+                              <span className="text-xs font-bold text-gray-900">
+                                {requestedRole === "Leader" ? `Leader #${pos}` : `Co-Leader #${pos - 3}`}
+                              </span>
+                              <span className="text-2xs text-gray-500 font-mono">
+                                Slot #{pos}
+                              </span>
+                              <span
+                                className={`text-3xs uppercase font-bold px-1.5 py-0.5 rounded-full ${
+                                  isOccupied
+                                    ? "bg-amber-100 text-amber-800 border border-amber-300"
+                                    : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                                }`}
+                              >
+                                {isOccupied ? "Occupied" : "Open"}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Option: Any available position in this role (Flexible Preference) */}
+                      <button
+                        type="button"
+                        onClick={() => onRequestedPosition(0)}
+                        className={`w-full py-2 px-3 rounded-lg border text-xs font-medium transition-all flex items-center justify-between ${
+                          requestedPosition === 0
+                            ? "border-blue-600 bg-blue-50/90 text-blue-900 ring-2 ring-blue-200 font-semibold"
+                            : "border-gray-200 bg-white/70 hover:bg-white text-gray-700"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Check size={14} className={requestedPosition === 0 ? "text-blue-600" : "text-transparent"} />
+                          Any available position in this role (Flexible)
+                        </span>
+                        <span className="text-2xs text-gray-500">Recommended for highest match</span>
+                      </button>
+
+                      {/* Occupied Seat Explanation Banner */}
+                      {isSelectedSlotOccupied && (
+                        <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-50/90 border border-amber-200 text-xs text-amber-800">
+                          <AlertCircle size={15} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                          <p className="text-2xs leading-relaxed">
+                            <strong>Slot #{requestedPosition} is currently occupied.</strong> Selecting this records your preference for administrator evaluation, backup seating, or potential reallocation. Seat assignment is never guaranteed.
+                          </p>
+                        </div>
+                      )}
+
+                      <p className="text-3xs text-gray-500 leading-normal">
+                        Note: Selecting a numbered position records your preference. Placement is finalized during administrator review and is not an instant reservation.
+                      </p>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Profile Picture Upload */}
+                <div>
+                  <label className="text-sm font-medium text-gray-800 block mb-1">
+                    Profile Picture <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="h-16 w-16 rounded-full overflow-hidden border border-gray-200 shadow-sm bg-white/70 flex items-center justify-center flex-shrink-0">
+                      {profilePreview ? (
+                        <img src={profilePreview} alt="Preview" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full bg-gradient-to-br from-slate-100 to-white" />
+                      )}
+                    </div>
+                    <label
+                      htmlFor="profileImage"
+                      className="flex-1 cursor-pointer rounded-2xl border border-white/60 bg-white/60 backdrop-blur-md px-4 py-3 shadow-sm hover:shadow-md transition ring-1 ring-transparent hover:ring-[rgba(167,216,255,0.5)]"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-[#333333] truncate">
+                          {profilePreview ? 'Change image' : 'Choose JPG or PNG (max 5MB)'}
+                        </span>
+                        <Button type="button" variant="outline" size="sm" className="glass-button text-[#333333] pointer-events-none">
+                          Browse…
+                        </Button>
+                      </div>
+                      <input
+                        id="profileImage"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        onChange={(e) => onImageChange(e.target.files?.[0] ?? null)}
+                      />
+                    </label>
+                  </div>
+                  {imageError && <p className="mt-2 text-xs text-red-600 font-medium">{imageError}</p>}
+                </div>
+
+                {/* Short Bio */}
+                <div>
+                  <label className="text-sm font-medium text-gray-800">Short Bio</label>
+                  <Textarea
+                    value={bio}
+                    onChange={(e) => onBio(e.target.value)}
+                    placeholder="Share your background, vision for 2027, and what you hope to contribute..."
+                    rows={4}
+                    maxLength={1000}
+                    className="mt-1 bg-white/70 border-white/60 focus:bg-white transition"
+                  />
+                </div>
+
+                {/* Submit Application Button */}
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full text-black font-semibold hover:brightness-105 shadow-md py-6 text-base"
+                  style={{ backgroundImage: 'linear-gradient(135deg,#D7C4F3,#A7D8FF)' }}
+                >
+                  {submitting ? "Submitting Application..." : "Submit Application"}
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       </div>
-    </section>);
-
+    </section>
+  );
 }
 
 function FAQ({ faqs }: { faqs: SiteContent['faqs'] }) {

@@ -21,6 +21,9 @@ export type SubmittedApplication = {
   status: string;
   adminNotes?: string | null;
   leaderId: number | null;
+  requestedRole?: string | null;
+  requestedPosition?: number | null;
+  instagramUsername?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -125,29 +128,14 @@ export const memoryStore = {
     whatsapp: string;
     bio: string | null;
     profileImage: string;
-  }): { application: SubmittedApplication; leader: LeaderSlot } | { error: string } {
+    requestedRole?: string | null;
+    requestedPosition?: number | null;
+    instagramUsername?: string | null;
+  }): { application: SubmittedApplication } {
     const store = getStore();
-
-    // Find first open leader by position
-    const openLeader = store.leaders
-      .filter((l) => l.status === 'open')
-      .sort((a, b) => a.position - b.position)[0];
-
-    if (!openLeader) {
-      return { error: 'NO_OPEN_SLOTS' };
-    }
-
     const now = new Date();
-    const assignedRole = openLeader.position <= 3 ? 'Leader' : 'Co-Leader';
 
-    // Update leader slot
-    openLeader.name = data.name;
-    openLeader.role = assignedRole;
-    openLeader.avatar = data.profileImage;
-    openLeader.status = 'filled';
-    openLeader.updatedAt = now;
-
-    // Create application record
+    // Create application record as pending and unassigned
     const application: SubmittedApplication = {
       id: store.nextAppId++,
       name: data.name,
@@ -156,18 +144,21 @@ export const memoryStore = {
       bio: data.bio,
       profileImage: data.profileImage,
       status: 'pending',
-      leaderId: openLeader.id,
+      leaderId: null,
+      requestedRole: data.requestedRole || null,
+      requestedPosition: data.requestedPosition ?? null,
+      instagramUsername: data.instagramUsername || null,
       createdAt: now,
       updatedAt: now,
     };
 
     store.applications.push(application);
-    return { application: { ...application }, leader: { ...openLeader } };
+    return { application: { ...application } };
   },
 
   updateApplication(
     id: number,
-    updates: { status?: string; adminNotes?: string | null }
+    updates: { status?: string; adminNotes?: string | null; leaderId?: number | null }
   ): SubmittedApplication | null {
     const store = getStore();
     const app = store.applications.find((a) => a.id === id);
@@ -178,6 +169,9 @@ export const memoryStore = {
     }
     if (updates.adminNotes !== undefined) {
       app.adminNotes = updates.adminNotes;
+    }
+    if (updates.leaderId !== undefined) {
+      app.leaderId = updates.leaderId;
     }
     app.updatedAt = new Date();
     return { ...app };
