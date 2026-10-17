@@ -292,6 +292,11 @@ export function validateSiteContent(input: any): {
     };
   }
 
+  // Support both direct SiteContent and wrapped { content: SiteContent }
+  if (input.content && typeof input.content === 'object') {
+    input = input.content;
+  }
+
   // Deep clone default as base to ensure all fields exist
   const sanitized: SiteContent = JSON.parse(JSON.stringify(DEFAULT_SITE_CONTENT));
 

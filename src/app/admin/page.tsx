@@ -62,6 +62,34 @@ type Leader = {
   position: number;
 };
 
+async function parseResponsePayload<T = any>(
+  res: Response
+): Promise<{ ok: boolean; status: number; data: T | null; error: string | null }> {
+  let data: any = null;
+  let rawText = "";
+
+  try {
+    rawText = await res.text();
+    if (rawText && rawText.trim()) {
+      data = JSON.parse(rawText);
+    }
+  } catch {
+    // Non-JSON response payload
+  }
+
+  if (!res.ok) {
+    const errorMsg =
+      (data && typeof data === "object" && (data.error || data.message)) ||
+      (rawText && rawText.length > 0 && rawText.length < 200 && !rawText.includes("<html")
+        ? rawText.trim()
+        : null) ||
+      `Request failed with status ${res.status}`;
+    return { ok: false, status: res.status, data: null, error: String(errorMsg) };
+  }
+
+  return { ok: true, status: res.status, data: (data as T) ?? null, error: null };
+}
+
 export default function AdminPage() {
   const [applications, setApplications] = useState<Application[]>([]);
   const [leaders, setLeaders] = useState<Leader[]>([]);
@@ -124,22 +152,22 @@ export default function AdminPage() {
         setLeaders([]);
         return;
       }
-      if (!appsRes.ok) throw new Error("Failed to fetch applications");
+      const parsedApps = await parseResponsePayload<Application[]>(appsRes);
+      if (!parsedApps.ok) throw new Error(parsedApps.error || "Failed to fetch applications");
 
-      const appsData = await appsRes.json();
       const leadersRes = await fetch(`/api/leaders?t=${Date.now()}`, { cache: "no-store" });
-      if (!leadersRes.ok) throw new Error("Failed to fetch leader slots");
-      const leadersData = await leadersRes.json();
+      const parsedLeaders = await parseResponsePayload<Leader[]>(leadersRes);
+      if (!parsedLeaders.ok) throw new Error(parsedLeaders.error || "Failed to fetch leader slots");
 
-      setApplications(Array.isArray(appsData) ? appsData : []);
-      setLeaders(Array.isArray(leadersData) ? leadersData : []);
+      setApplications(Array.isArray(parsedApps.data) ? parsedApps.data : []);
+      setLeaders(Array.isArray(parsedLeaders.data) ? parsedLeaders.data : []);
       setAuthenticated(true);
 
       // Also fetch content
       await fetchContentData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching admin data:", error);
-      toast.error("Failed to load admin data. Check database connection.");
+      toast.error(error?.message || "Failed to load admin data. Check database connection.");
     } finally {
       setLoading(false);
     }
@@ -149,7 +177,13 @@ export default function AdminPage() {
     try {
       const res = await fetch(`/api/admin/content?t=${Date.now()}`, { cache: "no-store" });
       if (res.ok) {
-        const data = await res.json();
+        const parsed = await parseResponsePayload<{
+          content?: SiteContent;
+          version?: number;
+          updatedAt?: string | Date;
+          revisions?: any[];
+        }>(res);
+        const data = parsed.data;
         if (data && data.content) {
           setSiteContentState(data.content);
           setOriginalContent(data.content);
@@ -169,16 +203,16 @@ export default function AdminPage() {
     setLoginError("");
 
     try {
-      const res = await fetch("/api/admin/auth", {
+      const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: adminPassword }),
       });
 
-      const data = await res.json();
+      const parsed = await parseResponsePayload(res);
 
-      if (!res.ok) {
-        setLoginError(data.error || "Authentication failed.");
+      if (!parsed.ok) {
+        setLoginError(parsed.error || "Authentication failed.");
         return;
       }
 
@@ -195,13 +229,14 @@ export default function AdminPage() {
 
   async function handleLogout() {
     try {
-      await fetch("/api/admin/auth", { method: "DELETE" });
+      await fetch("/api/admin/logout", { method: "POST" });
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
       setAuthenticated(false);
       setApplications([]);
       setLeaders([]);
       toast.info("Logged out successfully.");
-    } catch (error) {
-      console.error("Logout error:", error);
     }
   }
 
@@ -210,20 +245,26 @@ export default function AdminPage() {
     setIsSavingContent(true);
     try {
       const res = await fetch("/api/admin/content", {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: siteContentState }),
+        body: JSON.stringify(siteContentState),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to save website content");
+      const parsed = await parseResponsePayload<{
+        content?: SiteContent;
+        version?: number;
+        updatedAt?: string | Date;
+      }>(res);
+
+      if (!parsed.ok || !parsed.data) {
+        throw new Error(parsed.error || "Failed to save website content");
       }
 
-      setOriginalContent(data.content);
-      setSiteContentState(data.content);
-      setContentVersion(data.version);
-      setContentUpdatedAt(data.updatedAt);
+      const savedContent = parsed.data.content || siteContentState;
+      setOriginalContent(savedContent);
+      setSiteContentState(savedContent);
+      setContentVersion(parsed.data.version ?? (contentVersion + 1));
+      setContentUpdatedAt(parsed.data.updatedAt || new Date());
       toast.success("Website content saved and published successfully!");
       await fetchContentData();
     } catch (error: any) {
@@ -247,14 +288,19 @@ export default function AdminPage() {
         method: "POST",
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to reset content");
+      const parsed = await parseResponsePayload<{
+        content?: SiteContent;
+        version?: number;
+      }>(res);
+
+      if (!parsed.ok || !parsed.data) {
+        throw new Error(parsed.error || "Failed to reset content");
       }
 
-      setOriginalContent(data.content);
-      setSiteContentState(data.content);
-      setContentVersion(data.version || 1);
+      const resetContent = parsed.data.content || DEFAULT_SITE_CONTENT;
+      setOriginalContent(resetContent);
+      setSiteContentState(resetContent);
+      setContentVersion(parsed.data.version || 1);
       setContentUpdatedAt(new Date());
       toast.success("Website content reset to defaults!");
       await fetchContentData();
@@ -306,9 +352,9 @@ export default function AdminPage() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to assign seat.");
+      const parsed = await parseResponsePayload(res);
+      if (!parsed.ok) {
+        throw new Error(parsed.error || "Failed to assign seat.");
       }
 
       toast.success(`Assigned ${assigningApp.name} to Slot #${selectedAssignSeat} and approved!`);
@@ -344,9 +390,9 @@ export default function AdminPage() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to reassign seat.");
+      const parsed = await parseResponsePayload(res);
+      if (!parsed.ok) {
+        throw new Error(parsed.error || "Failed to reassign seat.");
       }
 
       if (selectedReassignSeat === null) {
@@ -383,9 +429,9 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to update status");
+      const parsed = await parseResponsePayload(res);
+      if (!parsed.ok) {
+        throw new Error(parsed.error || "Failed to update status");
       }
 
       await fetchData();
@@ -420,9 +466,9 @@ export default function AdminPage() {
         method: "DELETE",
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to delete application");
+      const parsed = await parseResponsePayload(res);
+      if (!parsed.ok) {
+        throw new Error(parsed.error || "Failed to delete application");
       }
 
       toast.success(`Removed application for ${target.name}`);
@@ -450,9 +496,9 @@ export default function AdminPage() {
         body: JSON.stringify({ position: target.position }),
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to reset slot");
+      const parsed = await parseResponsePayload(res);
+      if (!parsed.ok) {
+        throw new Error(parsed.error || "Failed to reset slot");
       }
 
       toast.success(`Slot #${target.position} reset to open (assigned applicant moved to pending)`);

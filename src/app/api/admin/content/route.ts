@@ -97,8 +97,14 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Malformed JSON payload.' }, { status: 400 });
   }
 
+  // Support both direct SiteContent or wrapped { content: SiteContent }
+  const contentToValidate =
+    body && typeof body === 'object' && body.content && typeof body.content === 'object'
+      ? body.content
+      : body;
+
   // Validate and sanitize content
-  const validation = validateSiteContent(body);
+  const validation = validateSiteContent(contentToValidate);
   if (!validation.valid) {
     return NextResponse.json(
       { error: 'Content validation failed', details: validation.errors },
