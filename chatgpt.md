@@ -28,6 +28,15 @@ Welcome to the comprehensive technical documentation for the **MEP 2027 New Year
      - Profile photo zoom modal & detailed application inspector.
      - Status updates (Approve, Reject, Pending) and full deletion with linked slot recovery.
      - CSV export of applicant records.
+  6. **Dynamic Website Content Manager & CMS (`/admin` → Website Content)**:
+     - **About MEP**: Edit main heading, subtitle, introduction paragraph, add/remove/reorder descriptive paragraphs, change squad counts, edit leader & co-leader responsibilities, and highlight callout text.
+     - **Hero & Headline**: Edit hero title, subtitle, introduction, CTA labels/links, and visibility.
+     - **Event & Countdown**: Configurable event date/time, timezone, and countdown visibility.
+     - **Announcements**: Dynamic banner with scheduling (start/end dates) and 4 safe color themes.
+     - **FAQs Manager**: Add, edit, remove, and reorder questions and answers.
+     - **Contact & Social Destinations**: Safe HTTPS, WhatsApp, and mailto destination links.
+     - **Live Preview Modal**: Test edits on simulated Desktop (1024px) and Mobile (375px) viewports before saving.
+     - **Revision History & Non-Destructive Reset**: Content change logs with version tracking and safe reset-to-default that never touches applicant records or leader slots.
 
 ---
 
@@ -84,6 +93,26 @@ All production data is persisted in a Turso cloud database instance. The databas
 | `leader_id` | INTEGER | REFERENCES `leaders(id)` | Linked leader slot ID (or NULL) |
 | `created_at` | INTEGER | Timestamp | Submission time |
 | `updated_at` | INTEGER | Timestamp | Last status change time |
+
+#### Table: `site_content`
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | TEXT | PRIMARY KEY | Single document key (`'main'`) |
+| `data` | TEXT | NOT NULL | Full JSON string of `SiteContent` |
+| `version` | INTEGER | NOT NULL DEFAULT `1` | Optimistic concurrency & version number |
+| `updated_by` | TEXT | NULLABLE | Admin session identifier |
+| `created_at` | INTEGER | Timestamp | Record creation time |
+| `updated_at` | INTEGER | Timestamp | Last update time |
+
+#### Table: `content_revisions`
+| Column | Type | Constraints | Description |
+|---|---|---|---|
+| `id` | INTEGER | PRIMARY KEY AUTOINCREMENT | Revision record identifier |
+| `content_id` | TEXT | NOT NULL | Linked content key (`'main'`) |
+| `data` | TEXT | NOT NULL | JSON snapshot of site content |
+| `action` | TEXT | NOT NULL DEFAULT `'update'` | Action type (`'initial'`, `'admin_edit'`, `'admin_reset'`) |
+| `created_by` | TEXT | NULLABLE | Admin identifier |
+| `created_at` | INTEGER | Timestamp | Snapshot timestamp |
 
 ### Concurrency & Race-Condition Protection
 When an application is submitted via `POST /api/applications`:
@@ -177,6 +206,24 @@ Client fetches append cache-busting timestamp queries (`?t=${Date.now()}`).
   - **Auth**: Admin only
   - **Body**: `{ position: number }` (1 to 6)
   - **Action**: Resets specified slot back to open and clears applicant linkage.
+
+### Website Content CMS
+- `GET /api/content`
+  - **Auth**: Public
+  - **Returns**: Current published `SiteContent` with any expired or future announcements automatically filtered out.
+- `GET /api/admin/content`
+  - **Auth**: Admin only
+  - **Returns**: `{ content: SiteContent, version: number, updatedAt: number, revisions: ContentRevision[] }`
+- `PATCH /api/admin/content`
+  - **Auth**: Admin only
+  - **Body**: Complete or updated `SiteContent` JSON object.
+  - **Validation**: Enforces non-empty headings, safe URL protocols (`https:`, `mailto:`, WhatsApp), length bounds, and valid dates/timezones.
+  - **Action**: Increments version, updates database `site_content`, and appends an entry to `content_revisions`.
+  - **Returns**: `200 OK` with `{ success: true, version: number }`.
+- `POST /api/admin/content/reset`
+  - **Auth**: Admin only
+  - **Action**: Resets `site_content` back to `DEFAULT_SITE_CONTENT` and creates a reset revision record. Does not alter applications or leader slots.
+  - **Returns**: `200 OK` with `{ success: true, content: SiteContent }`.
 
 ### Admin Auth
 - `POST /api/admin/login`

@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/libsql';
 import { createClient, type Client } from '@libsql/client';
 import * as schema from '@/db/schema';
+import { DEFAULT_SITE_CONTENT } from '@/lib/content';
 
 type DrizzleDB = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -108,7 +109,31 @@ export async function ensureDbInitialized(): Promise<void> {
         );
       `);
 
-      // 3. Ensure any missing columns if existing table had older schema
+      // 3. Create site_content table
+      await client.execute(`
+        CREATE TABLE IF NOT EXISTS site_content (
+          id TEXT PRIMARY KEY NOT NULL,
+          data TEXT NOT NULL,
+          version INTEGER DEFAULT 1 NOT NULL,
+          updated_by TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+      `);
+
+      // 4. Create content_revisions table
+      await client.execute(`
+        CREATE TABLE IF NOT EXISTS content_revisions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+          content_id TEXT NOT NULL,
+          data TEXT NOT NULL,
+          action TEXT DEFAULT 'update' NOT NULL,
+          created_by TEXT,
+          created_at INTEGER NOT NULL
+        );
+      `);
+
+      // 5. Ensure any missing columns if existing table had older schema
       try {
         await client.execute('ALTER TABLE applications ADD COLUMN profile_image TEXT');
       } catch {}
@@ -119,7 +144,7 @@ export async function ensureDbInitialized(): Promise<void> {
         await client.execute('ALTER TABLE leaders ADD COLUMN position INTEGER');
       } catch {}
 
-      // 4. Seed the 6 default leader slots if table has 0 rows
+      // 6. Seed the 6 default leader slots if table has 0 rows
       const countRes = await client.execute('SELECT COUNT(*) as c FROM leaders');
       const count = Number(countRes.rows[0]?.c || 0);
 
@@ -133,6 +158,26 @@ export async function ensureDbInitialized(): Promise<void> {
             args: [null, role, avatar, 'open', i, now, now],
           });
         }
+      }
+
+      // 7. Seed initial site content if absent
+      const contentRes = await client.execute({
+        sql: 'SELECT COUNT(*) as c FROM site_content WHERE id = ?',
+        args: ['main'],
+      });
+      const contentCount = Number(contentRes.rows[0]?.c || 0);
+
+      if (contentCount === 0) {
+        const now = Date.now();
+        const jsonPayload = JSON.stringify(DEFAULT_SITE_CONTENT);
+        await client.execute({
+          sql: 'INSERT INTO site_content (id, data, version, updated_by, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+          args: ['main', jsonPayload, 1, 'system_initial', now, now],
+        });
+        await client.execute({
+          sql: 'INSERT INTO content_revisions (content_id, data, action, created_by, created_at) VALUES (?, ?, ?, ?, ?)',
+          args: ['main', jsonPayload, 'initial', 'system_initial', now],
+        });
       }
     } catch (err) {
       console.error('Failed to initialize database schema:', err);

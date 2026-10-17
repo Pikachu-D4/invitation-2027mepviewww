@@ -1,3 +1,5 @@
+import { DEFAULT_SITE_CONTENT, type SiteContent } from '@/lib/content';
+
 export type LeaderSlot = {
   id: number;
   name: string | null;
@@ -21,6 +23,15 @@ export type SubmittedApplication = {
   leaderId: number | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+export type MemoryRevision = {
+  id: number;
+  contentId: string;
+  data: SiteContent;
+  action: string;
+  createdBy?: string;
+  createdAt: Date;
 };
 
 const DEFAULT_AVATARS = [
@@ -49,7 +60,10 @@ function createDefaultLeaders(): LeaderSlot[] {
 interface MemoryStore {
   leaders: LeaderSlot[];
   applications: SubmittedApplication[];
+  siteContent: SiteContent;
+  revisions: MemoryRevision[];
   nextAppId: number;
+  nextRevId: number;
 }
 
 declare global {
@@ -59,10 +73,23 @@ declare global {
 
 function getStore(): MemoryStore {
   if (!globalThis.__mep_store) {
+    const initialContent = JSON.parse(JSON.stringify(DEFAULT_SITE_CONTENT));
     globalThis.__mep_store = {
       leaders: createDefaultLeaders(),
       applications: [],
+      siteContent: initialContent,
+      revisions: [
+        {
+          id: 1,
+          contentId: 'main',
+          data: initialContent,
+          action: 'initial',
+          createdBy: 'system',
+          createdAt: new Date(),
+        },
+      ],
       nextAppId: 1,
+      nextRevId: 2,
     };
   }
   return globalThis.__mep_store;
@@ -177,5 +204,48 @@ export const memoryStore = {
     }
 
     return true;
+  },
+
+  // Website Content
+  getContent(): SiteContent {
+    const store = getStore();
+    return JSON.parse(JSON.stringify(store.siteContent));
+  },
+
+  updateContent(newContent: SiteContent, createdBy: string = 'admin'): SiteContent {
+    const store = getStore();
+    store.siteContent = JSON.parse(JSON.stringify(newContent));
+    store.revisions.unshift({
+      id: store.nextRevId++,
+      contentId: 'main',
+      data: JSON.parse(JSON.stringify(newContent)),
+      action: 'update',
+      createdBy,
+      createdAt: new Date(),
+    });
+    // Keep up to 20 revisions
+    if (store.revisions.length > 20) {
+      store.revisions.pop();
+    }
+    return JSON.parse(JSON.stringify(store.siteContent));
+  },
+
+  resetContent(createdBy: string = 'admin'): SiteContent {
+    const store = getStore();
+    store.siteContent = JSON.parse(JSON.stringify(DEFAULT_SITE_CONTENT));
+    store.revisions.unshift({
+      id: store.nextRevId++,
+      contentId: 'main',
+      data: JSON.parse(JSON.stringify(DEFAULT_SITE_CONTENT)),
+      action: 'reset',
+      createdBy,
+      createdAt: new Date(),
+    });
+    return JSON.parse(JSON.stringify(store.siteContent));
+  },
+
+  getRevisions(): MemoryRevision[] {
+    const store = getStore();
+    return [...store.revisions];
   },
 };

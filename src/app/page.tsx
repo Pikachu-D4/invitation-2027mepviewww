@@ -9,8 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Mail, MessageSquare, Send, Menu, X } from "lucide-react";
+import { Mail, MessageSquare, Send, Menu, X, Bell, ExternalLink, Sparkles, Youtube, Check, Phone } from "lucide-react";
 import { toast } from "sonner";
+import { DEFAULT_SITE_CONTENT, type SiteContent } from "@/lib/content";
 
 const TARGET_DATE = new Date("2027-01-01T00:00:00+05:30");
 
@@ -48,16 +49,35 @@ export default function Home() {
   const [profilePreview, setProfilePreview] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
+  const [content, setContent] = useState<SiteContent>(DEFAULT_SITE_CONTENT);
+
   const [timeLeft, setTimeLeft] = useState(getTimeLeft());
   useEffect(() => {
     const id = setInterval(() => setTimeLeft(getTimeLeft()), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [content.event.targetDate]);
 
-  // Fetch leaders from database / store
+  // Fetch leaders & site content from database / store
   useEffect(() => {
     fetchLeaders();
+    fetchContent();
   }, []);
+
+  async function fetchContent() {
+    try {
+      const response = await fetch(`/api/content?t=${Date.now()}`, {
+        cache: 'no-store',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data && typeof data === 'object') {
+          setContent(data);
+        }
+      }
+    } catch (error) {
+      console.warn('Could not refresh site content:', error);
+    }
+  }
 
   async function fetchLeaders() {
     try {
@@ -83,8 +103,11 @@ export default function Home() {
   }, []);
 
   function getTimeLeft() {
+    const rawTarget = content?.event?.targetDate || "2027-01-01T00:00:00+05:30";
+    const target = new Date(rawTarget);
+    const validTarget = isNaN(target.getTime()) ? TARGET_DATE : target;
     const now = new Date();
-    const diff = TARGET_DATE.getTime() - now.getTime();
+    const diff = validTarget.getTime() - now.getTime();
     const clamped = Math.max(0, diff);
     const s = Math.floor(clamped / 1000);
     const days = Math.floor(s / 86400);
@@ -266,15 +289,24 @@ export default function Home() {
       {/* Soft pastel glow background with slight parallax */}
       <ParallaxBackground />
 
+      {content.announcement && content.announcement.enabled && (
+        <AnnouncementBanner announcement={content.announcement} />
+      )}
+
       <Navbar filled={filled} total={total} />
 
       <SectionWithParallax>
-        <Hero timeLeft={timeLeft} celebrate={celebrate} />
+        <Hero
+          timeLeft={timeLeft}
+          celebrate={celebrate}
+          hero={content.hero}
+          event={content.event}
+        />
       </SectionWithParallax>
 
       <main className="relative z-10">
         <SectionWithParallax>
-          <About />
+          <About about={content.about} />
         </SectionWithParallax>
         <SectionWithParallax>
           <LeadersGrid leaders={leaders} filled={filled} total={total} loading={loading} />
@@ -298,10 +330,10 @@ export default function Home() {
 
         </SectionWithParallax>
         <SectionWithParallax>
-          <FAQ />
+          <FAQ faqs={content.faqs} />
         </SectionWithParallax>
         <SectionWithParallax>
-          <Contact />
+          <Contact contact={content.contact} />
         </SectionWithParallax>
       </main>
 
@@ -459,11 +491,58 @@ function Navbar({ filled, total }: {filled: number;total: number;}) {
   );
 }
 
-function Hero({ timeLeft, celebrate }: {timeLeft: {days: number;hours: number;minutes: number;seconds: number;};celebrate: boolean;}) {
+function AnnouncementBanner({ announcement }: { announcement: SiteContent['announcement'] }) {
+  if (!announcement || !announcement.enabled || !announcement.text) return null;
+
+  const styleClass =
+    announcement.style === "gold"
+      ? "bg-amber-100/90 text-amber-900 border-amber-300 shadow-xs"
+      : announcement.style === "blue"
+      ? "bg-blue-600 text-white border-blue-500 shadow-sm"
+      : announcement.style === "festive"
+      ? "bg-gradient-to-r from-pink-500 via-purple-600 to-indigo-600 text-white border-purple-400 shadow-md"
+      : announcement.style === "minimal"
+      ? "bg-white/80 text-gray-800 border-gray-200 backdrop-blur-md"
+      : "bg-gradient-to-r from-blue-600 to-indigo-600 text-white border-indigo-400 shadow-sm";
+
+  return (
+    <div className={`w-full py-2.5 px-4 text-center text-xs sm:text-sm font-medium border-b backdrop-blur-md transition-all relative z-40 ${styleClass}`}>
+      <div className="mx-auto max-w-6xl flex items-center justify-center gap-2 flex-wrap">
+        <span className="flex items-center gap-1.5">
+          <Bell size={14} className="animate-bounce flex-shrink-0" />
+          <span>{announcement.text}</span>
+        </span>
+        {announcement.linkLabel && announcement.linkUrl && (
+          <a
+            href={announcement.linkUrl}
+            className="inline-flex items-center gap-1 underline underline-offset-4 font-bold hover:opacity-80 transition ml-1"
+          >
+            <span>{announcement.linkLabel}</span>
+            <ExternalLink size={12} />
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Hero({
+  timeLeft,
+  celebrate,
+  hero,
+  event,
+}: {
+  timeLeft: { days: number; hours: number; minutes: number; seconds: number };
+  celebrate: boolean;
+  hero: SiteContent['hero'];
+  event: SiteContent['event'];
+}) {
+  if (!hero || !hero.visible) return null;
+
   return (
     <section id="hero" className="relative overflow-hidden">
       <div className="relative mx-auto max-w-6xl px-4 pt-20 pb-24 md:pt-28 md:pb-32 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
-        {/* New: Glossy invitation box with liquid-glass UI */}
+        {/* Glossy invitation box with liquid-glass UI */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -474,88 +553,119 @@ function Hero({ timeLeft, celebrate }: {timeLeft: {days: number;hours: number;mi
           }}>
 
           <div className="liquid-bg"></div>
-          {/* Subtle glow behind main text */}
-          {celebrate &&
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-br from-gold/20 via-transparent to-blue-100/20 rounded-3xl blur-3xl opacity-70"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1.5, opacity: 0.8 }}
-            transition={{ duration: 3, repeat: 1 }} />
+          {celebrate && (
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-br from-gold/20 via-transparent to-blue-100/20 rounded-3xl blur-3xl opacity-70"
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1.5, opacity: 0.8 }}
+              transition={{ duration: 3, repeat: 1 }}
+            />
+          )}
 
-          }
           <div className="relative z-10 text-center">
+            {hero.welcomeBadge && (
+              <div className="mb-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 border border-white/60 text-xs font-semibold text-gray-800 shadow-xs backdrop-blur-md">
+                <Sparkles size={13} className="text-amber-500" />
+                <span>{hero.welcomeBadge}</span>
+              </div>
+            )}
+
             <motion.h1 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} viewport={{ once: true }}
             className="text-4xl md:text-6xl font-extrabold leading-tight mb-6">
-              <span className="block glass-text-charcoal shimmer" style={{ fontFamily: "Cinzel, serif" }}>New Year 2027</span>
-              <span className="block glass-text-pastel-blue shimmer" style={{ fontFamily: "Cinzel, serif" }}>MEP Invitation</span>
+              <span className="block glass-text-charcoal shimmer" style={{ fontFamily: "Cinzel, serif" }}>
+                {hero.titleLine1}
+              </span>
+              <span className="block glass-text-pastel-blue shimmer" style={{ fontFamily: "Cinzel, serif" }}>
+                {hero.titleLine2}
+              </span>
             </motion.h1>
+
             <motion.p initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.8 }} viewport={{ once: true }}
-            className="mb-8 text-base md:text-lg text-[#333333] max-w-2xl mx-auto">
-              Celebrate progress, leadership, and community. You are invited to join New Year 2027 AMV MEP.
+            className="mb-8 text-base md:text-lg text-[#333333] max-w-2xl mx-auto leading-relaxed">
+              {hero.subtitle}
             </motion.p>
+
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
-              <a href="#apply"><Button size="lg" className="liquid-button text-black shadow-[0_8px_32px_0_rgba(167,216,255,0.1)] hover:shadow-[0_8px_32px_0_rgba(167,216,255,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(167,216,255,0.6))' }}>Apply as Leader</Button></a>
-              <a href="#apply"><Button size="lg" className="liquid-button text-[#333333] shadow-[0_8px_32px_0_rgba(215,196,243,0.1)] hover:shadow-[0_8px_32px_0_rgba(215,196,243,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(215,196,243,0.6))' }}>Apply as Co-Leader</Button></a>
-              <a href="#about"><Button variant="outline" size="lg" className="glass-button border-[rgba(51,51,51,0.2)] text-[#333333] hover:bg-[rgba(255,255,255,0.5)] hover:shadow-[0_4px_16px_0_rgba(51,51,51,0.1)] backdrop-blur-md">Learn more</Button></a>
+              {hero.primaryCtaLabel && (
+                <a href={hero.primaryCtaLink || "#apply"}>
+                  <Button size="lg" className="liquid-button text-black shadow-[0_8px_32px_0_rgba(167,216,255,0.1)] hover:shadow-[0_8px_32px_0_rgba(167,216,255,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(167,216,255,0.6))' }}>
+                    {hero.primaryCtaLabel}
+                  </Button>
+                </a>
+              )}
+              {hero.secondaryCtaLabel && (
+                <a href={hero.secondaryCtaLink || "#apply"}>
+                  <Button size="lg" className="liquid-button text-[#333333] shadow-[0_8px_32px_0_rgba(215,196,243,0.1)] hover:shadow-[0_8px_32px_0_rgba(215,196,243,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(215,196,243,0.6))' }}>
+                    {hero.secondaryCtaLabel}
+                  </Button>
+                </a>
+              )}
+              {hero.learnMoreLabel && (
+                <a href={hero.learnMoreLink || "#about"}>
+                  <Button variant="outline" size="lg" className="glass-button border-[rgba(51,51,51,0.2)] text-[#333333] hover:bg-[rgba(255,255,255,0.5)] hover:shadow-[0_4px_16px_0_rgba(51,51,51,0.1)] backdrop-blur-md">
+                    {hero.learnMoreLabel}
+                  </Button>
+                </a>
+              )}
             </div>
 
-            {/* Flipping Countdown with liquid glass effects */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.8 }}
-              className="max-w-xl mx-auto">
-
+            {event && event.countdownVisible && (
               <motion.div
-                className="text-center mb-6"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}>
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.8 }}
+                className="max-w-xl mx-auto">
 
-                <span
-                  className="text-xl md:text-2xl text-[#333333] glass-text-charcoal"
-                  style={{ fontFamily: "Inter, sans-serif" }}>
+                <motion.div
+                  className="text-center mb-6"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}>
 
-                  Total days left in New Year
-                </span>
+                  <span
+                    className="text-xl md:text-2xl text-[#333333] glass-text-charcoal"
+                    style={{ fontFamily: "Inter, sans-serif" }}>
+                    {event.countdownHeading}
+                  </span>
+                </motion.div>
+                <motion.div
+                  className="glass-panel p-4 rounded-xl bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.2)] backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.1)] overflow-hidden"
+                  whileHover={{ scale: 1.01 }}
+                  transition={{ duration: 0.3 }}>
+
+                  <div className="liquid-bg"></div>
+                  <div className="grid grid-cols-4 gap-3 sm:gap-6 relative z-10">
+                    {(['days', 'hours', 'minutes', 'seconds'] as const).map((unit) => {
+                      const value = timeLeft[unit];
+                      const label = unit.charAt(0).toUpperCase() + unit.slice(1);
+                      return (
+                        <motion.div key={unit} className="glass-panel group" whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
+                          <Card className="relative bg-[rgba(255,255,255,0.6)] border-[rgba(255,255,255,0.3)] backdrop-blur-xl shadow-[0_4px_16px_0_rgba(0,0,0,0.1)] overflow-hidden">
+                            <CardContent className="p-4 text-center relative z-10">
+                              <AnimatePresence mode="wait">
+                                <motion.div
+                                  key={value}
+                                  initial={{ y: 50, opacity: 0 }}
+                                  animate={{ y: 0, opacity: 1 }}
+                                  exit={{ y: -50, opacity: 0 }}
+                                  transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                                  className="text-3xl font-bold text-[#333333] drop-shadow-md"
+                                  style={{ fontFamily: "Cinzel, serif" }}>
+
+                                  {value.toString().padStart(2, '0')}
+                                </motion.div>
+                              </AnimatePresence>
+                              <div className="text-xs uppercase tracking-widest text-[#555555] mt-1">{label}</div>
+                            </CardContent>
+                          </Card>
+                        </motion.div>);
+
+                    })}
+                  </div>
+                </motion.div>
               </motion.div>
-              <motion.div
-                className="glass-panel p-4 rounded-xl bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.2)] backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.1)] overflow-hidden"
-                whileHover={{ scale: 1.01 }}
-                transition={{ duration: 0.3 }}>
-
-                <div className="liquid-bg"></div>
-                <div className="grid grid-cols-4 gap-3 sm:gap-6 relative z-10">
-                  {(['days', 'hours', 'minutes', 'seconds'] as const).map((unit) => {
-                    const value = timeLeft[unit];
-                    const label = unit.charAt(0).toUpperCase() + unit.slice(1);
-                    return (
-                      <motion.div key={unit} className="glass-panel group" whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
-                        <Card className="relative bg-[rgba(255,255,255,0.6)] border-[rgba(255,255,255,0.3)] backdrop-blur-xl shadow-[0_4px_16px_0_rgba(0,0,0,0.1)] overflow-hidden">
-                          <CardContent className="p-4 text-center relative z-10">
-                            <AnimatePresence mode="wait">
-                              <motion.div
-                                key={value}
-                                initial={{ y: 50, opacity: 0 }}
-                                animate={{ y: 0, opacity: 1 }}
-                                exit={{ y: -50, opacity: 0 }}
-                                transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                                className="text-3xl font-bold text-[#333333] drop-shadow-md"
-                                style={{ fontFamily: "Cinzel, serif" }}>
-
-                                {value.toString().padStart(2, '0')}
-                              </motion.div>
-                            </AnimatePresence>
-                            <div className="text-xs uppercase tracking-widest text-[#555555] mt-1">{label}</div>
-                          </CardContent>
-                        </Card>
-                      </motion.div>);
-
-                  })}
-                </div>
-              </motion.div>
-            </motion.div>
+            )}
           </div>
         </motion.div>
 
@@ -923,74 +1033,133 @@ function SectionWithParallax({ children }: {children: React.ReactNode;}) {
 
 }
 
-function About() {
-  const [typedText, setTypedText] = useState('');
-  const fullText = `🎬 2027 Mega AMV New Year MEP: Call for Leaders & Co-Leaders! 🎬
-
-We're kicking off the 2027 New Year with a MEP (Multi Editor Project) and we want you to be part of it!
-
-This ambitious project will unite 30 driven editors, working together in squads to create something unforgettable. Each squad will consist of:
-
-1 Leader
-1 Co-Leader
-8 Members
-
-That's 3 squads in total — all collaborating, creating, and pushing boundaries!
-
-🔥 We're currently looking for LEADERS & CO-LEADERS!
-
-Each leader and co-leader will be:
-
-~Personally selected and entrusted with guiding their squad
-~Responsible for communication, quality control, and team motivation
-~Collaborating closely with their co-leader/leader for smooth execution
-
-If you're passionate about editing, experienced in leadership, and ready to kick off 2027 with creativity and teamwork...
-
-👉 Fill out the Application Form below.`;
-
-  useEffect(() => {
-    let i = 0;
-    const timer = setInterval(() => {
-      if (i < fullText.length) {
-        setTypedText(fullText.slice(0, i + 1));
-        i++;
-      } else {
-        clearInterval(timer);
-      }
-    }, 30);
-    return () => clearInterval(timer);
-  }, []);
+function About({ about }: { about: SiteContent['about'] }) {
+  if (!about || !about.visible) return null;
 
   return (
     <section id="about" className="py-16 md:py-24">
-      <div className="mx-auto max-w-6xl px-4">
+      <div className="mx-auto max-w-6xl px-4 space-y-8">
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
-          <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "Cinzel, serif", color: '#333333' }}>About MEP</h2>
-          <p className="mt-3 text-muted-foreground max-w-3xl !whitespace-pre-line" style={{ color: '#333333' }}>{typedText}</p>
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-gray-900" style={{ fontFamily: "Cinzel, serif" }}>
+            {about.heading}
+          </h2>
+          {about.subtitle && (
+            <p className="mt-2 text-base md:text-lg font-semibold text-blue-900/90">
+              {about.subtitle}
+            </p>
+          )}
+          <p className="mt-4 text-base md:text-lg text-gray-800 leading-relaxed font-medium">
+            {about.introParagraph}
+          </p>
+
+          {about.additionalParagraphs && about.additionalParagraphs.length > 0 && (
+            <div className="mt-4 space-y-2">
+              {about.additionalParagraphs.map((para, i) => (
+                <p key={i} className="text-sm md:text-base text-gray-700 leading-relaxed">
+                  {para}
+                </p>
+              ))}
+            </div>
+          )}
         </motion.div>
 
-        <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[{
-            title: 'Vision', text: "To celebrate New Year 2027 with leaders and squads who combine artistry, teamwork, and energy shaping the ultimate AMV MEP."
-          }, {
-            title: 'Structure', text: "3 Leaders + 3 Co-Leaders working together to guide 6 squads with clear deadlines and progress monitoring."
-          }, {
-            title: "Leader & Co-Leader ROLE", text: "Observe, Direct, Support, Uplift and collaborate to deliver excellence."
-          }].map((item) =>
-          <Card key={item.title} className="bg-[rgba(255,255,255,0.5)] border-[rgba(255,255,255,0.3)] backdrop-blur-md">
-              <CardHeader>
-                <CardTitle className="!whitespace-pre-line" style={{ fontFamily: "Cinzel, serif", color: '#555555' }}>{item.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground !whitespace-pre-line !w-full !h-full !whitespace-pre-line" style={{ color: '#333333' }}>{item.text}</p>
-              </CardContent>
-            </Card>
-          )}
+        {/* Squad Composition Box */}
+        <div className="p-6 rounded-2xl glass-panel bg-white/70 border border-white/60 backdrop-blur-md shadow-sm">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
+            Squad Composition & Roles
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 text-center">
+              <span className="block text-2xl font-extrabold text-amber-700">
+                {about.squadStructure.leaderCount}
+              </span>
+              <span className="text-xs font-semibold text-amber-900">Leader per Squad</span>
+            </div>
+            <div className="p-3.5 rounded-xl bg-indigo-50/80 border border-indigo-200 text-center">
+              <span className="block text-2xl font-extrabold text-indigo-700">
+                {about.squadStructure.coLeaderCount}
+              </span>
+              <span className="text-xs font-semibold text-indigo-900">Co-Leader per Squad</span>
+            </div>
+            <div className="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200 text-center">
+              <span className="block text-2xl font-extrabold text-blue-700">
+                {about.squadStructure.memberCount}
+              </span>
+              <span className="text-xs font-semibold text-blue-900">Members per Squad</span>
+            </div>
+          </div>
+          <p className="text-xs text-gray-500 mt-3 text-center">
+            {about.squadCount} Squads in Total • {about.totalParticipants} Dedicated Video Editors
+          </p>
         </div>
-      </div>
-    </section>);
 
+        {/* Responsibilities Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="p-6 rounded-2xl glass-panel bg-white/60 border border-white/50 backdrop-blur-md shadow-sm">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-amber-900 mb-3 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+              Leader Responsibilities
+            </h4>
+            <ul className="space-y-2 text-sm text-gray-700">
+              {about.leaderResponsibilities.map((r, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className="text-amber-500 font-bold">~</span>
+                  <span>{r}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="p-6 rounded-2xl glass-panel bg-white/60 border border-white/50 backdrop-blur-md shadow-sm">
+            <h4 className="text-sm font-bold uppercase tracking-wider text-indigo-900 mb-3 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+              Co-Leader Responsibilities
+            </h4>
+            <ul className="space-y-2 text-sm text-gray-700">
+              {about.coLeaderResponsibilities.map((r, idx) => (
+                <li key={idx} className="flex items-start gap-2">
+                  <span className="text-indigo-500 font-bold">~</span>
+                  <span>{r}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* Info Cards Grid (Vision, Structure, Role) */}
+        {about.infoCards && about.infoCards.length > 0 && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
+            {about.infoCards.map((item) => (
+              <Card key={item.id || item.title} className="bg-[rgba(255,255,255,0.6)] border-[rgba(255,255,255,0.4)] backdrop-blur-md shadow-sm">
+                <CardHeader>
+                  <CardTitle style={{ fontFamily: "Cinzel, serif", color: '#333333' }}>{item.title}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-700 leading-relaxed">{item.text}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Highlight Callout & CTA Button */}
+        {about.calloutText && (
+          <div className="p-6 sm:p-8 rounded-2xl glass-panel bg-white/70 border border-white/60 backdrop-blur-md shadow-sm text-center space-y-4">
+            <p className="text-base sm:text-lg font-medium text-gray-900 max-w-2xl mx-auto leading-relaxed">
+              {about.calloutText}
+            </p>
+            {about.ctaButtonText && (
+              <a href={about.ctaButtonLink || "#apply"}>
+                <Button size="lg" className="liquid-button text-black font-semibold shadow-md" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.9), rgba(167,216,255,0.7))' }}>
+                  {about.ctaButtonText} →
+                </Button>
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
 }
 
 function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];filled: number;total: number;loading: boolean;}) {
@@ -1256,96 +1425,74 @@ function ApplicationForm(props: {
 
 }
 
-function FAQ() {
+function FAQ({ faqs }: { faqs: SiteContent['faqs'] }) {
+  if (!faqs || faqs.length === 0) return null;
+
   return (
     <section id="faq" className="py-16 md:py-24">
       <div className="mx-auto max-w-4xl px-4">
-        <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "Cinzel, serif", color: '#333333' }}>FAQ</h2>
+        <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "Cinzel, serif", color: '#333333' }}>
+          Frequently Asked Questions
+        </h2>
         <Accordion type="single" collapsible className="mt-6">
-          <AccordionItem value="item-1">
-            <AccordionTrigger>What is this MEP about?</AccordionTrigger>
-            <AccordionContent>
-              This MEP is a collaborative AMV project where multiple editors edit different parts of the same audio/theme for New Year Celebration.
-            </AccordionContent>
-          </AccordionItem>
-          
-          <AccordionItem value="item-2">
-            <AccordionTrigger>Do I need to follow a "New Year vibe" in my edit?</AccordionTrigger>
-            <AccordionContent>
-              Yes, bright colors, fireworks, celebration, transitions, or anything that gives a New Year energy feel.
-            </AccordionContent>
-          </AccordionItem>
-          
-          <AccordionItem value="item-3">
-            <AccordionTrigger>Is there a specific anime style for this New Year MEP?</AccordionTrigger>
-            <AccordionContent>
-              No specific anime is required, but clips should match the uplifting or fresh-start theme.
-            </AccordionContent>
-          </AccordionItem>
-          
-          <AccordionItem value="item-4">
-            <AccordionTrigger>Can I use darker or sad scenes?</AccordionTrigger>
-            <AccordionContent>
-              Light emotional scenes are allowed, but the overall tone must shift toward hope or new beginnings.
-            </AccordionContent>
-          </AccordionItem>
-          
-          <AccordionItem value="item-5">
-            <AccordionTrigger>What are the editing requirements for this New Year MEP?</AccordionTrigger>
-            <AccordionContent>
-              1080p, 23.976/30FPS, clean sync, and smooth transitions that match the celebration theme.
-            </AccordionContent>
-          </AccordionItem>
-          
-          <AccordionItem value="item-6">
-            <AccordionTrigger>When is the deadline?</AccordionTrigger>
-            <AccordionContent>
-              The final deadline for all members to submit their parts is on or before 15 December. 
-              Group leaders are responsible for collecting and merging all parts from their team, and they must complete the merging process by 20 December.
-            </AccordionContent>
-          </AccordionItem>
-          
-          <AccordionItem value="item-7">
-            <AccordionTrigger>Can I upload my part after the full MEP is released?</AccordionTrigger>
-            <AccordionContent>
-              Yes, Once the complete New Year MEP is uploaded, you are allowed to post your individual part.
-            </AccordionContent>
-          </AccordionItem>
-          
-          <AccordionItem value="item-8">
-            <AccordionTrigger>What happens if someone drops out near the deadline?</AccordionTrigger>
-            <AccordionContent>
-              In case of dropouts, backup editors may be assigned. This is the responsibility of the group leader and co-leader to ensure the MEP is completed and released on New Year.
-            </AccordionContent>
-          </AccordionItem>
-          
-          <AccordionItem value="item-9">
-            <AccordionTrigger>When will the final MEP be uploaded?</AccordionTrigger>
-            <AccordionContent>
-              The MEP will be uploaded on 1 January according to Hawaii Standard Time (HST). 
-              Since Hawaii reaches the New Year last, this ensures that every country in the world will already be in 1 January when the MEP goes live.
-            </AccordionContent>
-          </AccordionItem>
+          {faqs.map((faq, index) => (
+            <AccordionItem key={faq.id || index} value={faq.id || `faq-${index}`}>
+              <AccordionTrigger className="text-left font-medium text-gray-800 hover:text-black">
+                {faq.question}
+              </AccordionTrigger>
+              <AccordionContent className="text-gray-700 leading-relaxed text-sm md:text-base">
+                {faq.answer}
+              </AccordionContent>
+            </AccordionItem>
+          ))}
         </Accordion>
       </div>
-    </section>);
-
+    </section>
+  );
 }
 
-function Contact() {
+function Contact({ contact }: { contact: SiteContent['contact'] }) {
+  if (!contact) return null;
+
   return (
     <section id="contact" className="py-16 md:py-24">
       <div className="mx-auto max-w-4xl px-4 text-center">
-        <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "Cinzel, serif", color: '#333333' }}>Contact</h2>
-        <p className="mt-2 text-muted-foreground" style={{ color: '#333333' }}>Any questions or querry? We'd love to hear from you.</p>
+        <h2 className="text-3xl md:text-4xl font-bold" style={{ fontFamily: "Cinzel, serif", color: '#333333' }}>
+          {contact.heading || "Contact"}
+        </h2>
+        <p className="mt-2 text-muted-foreground" style={{ color: '#333333' }}>
+          {contact.subtitle || "Any questions or query? We'd love to hear from you."}
+        </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
-          <a className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-[rgba(255,255,255,0.3)] hover:bg-white/60" href="mailto:toxicsmile22936@gmail.com"><Mail size={18} /> toxicsmile22936@gmail.com</a>
-          <a className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-[rgba(255,255,255,0.3)] hover:bg-white/60" href="https://discordapp.com/users/1263021894773506162" target="_blank" rel="noreferrer"><MessageSquare size={18} /> Discord</a>
-          <a className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-[rgba(255,255,255,0.3)] hover:bg-white/60" href="https://t.me/toxicsmile22936" target="_blank" rel="noreferrer"><Send size={18} /> Telegram</a>
+          {contact.email && (
+            <a className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-[rgba(255,255,255,0.3)] hover:bg-white/60 text-sm font-medium transition" href={`mailto:${contact.email}`}>
+              <Mail size={18} /> {contact.email}
+            </a>
+          )}
+          {contact.discordUrl && (
+            <a className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-[rgba(255,255,255,0.3)] hover:bg-white/60 text-sm font-medium transition" href={contact.discordUrl} target="_blank" rel="noreferrer">
+              <MessageSquare size={18} /> Discord
+            </a>
+          )}
+          {contact.telegramUrl && (
+            <a className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-[rgba(255,255,255,0.3)] hover:bg-white/60 text-sm font-medium transition" href={contact.telegramUrl} target="_blank" rel="noreferrer">
+              <Send size={18} /> Telegram
+            </a>
+          )}
+          {contact.whatsappUrl && (
+            <a className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-[rgba(255,255,255,0.3)] hover:bg-white/60 text-sm font-medium transition" href={contact.whatsappUrl} target="_blank" rel="noreferrer">
+              <Phone size={18} /> WhatsApp
+            </a>
+          )}
+          {contact.youtubeUrl && (
+            <a className="inline-flex items-center gap-2 px-4 py-2 rounded-md border border-[rgba(255,255,255,0.3)] hover:bg-white/60 text-sm font-medium transition" href={contact.youtubeUrl} target="_blank" rel="noreferrer">
+              <Youtube size={18} /> YouTube
+            </a>
+          )}
         </div>
       </div>
-    </section>);
-
+    </section>
+  );
 }
 
 function Footer() {

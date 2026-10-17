@@ -27,7 +27,27 @@ export const applications = sqliteTable('applications', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
+export const siteContent = sqliteTable('site_content', {
+  id: text('id').primaryKey(), // 'main'
+  data: text('data').notNull(), // JSON payload string
+  version: integer('version').notNull().default(1),
+  updatedBy: text('updated_by'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const contentRevisions = sqliteTable('content_revisions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  contentId: text('content_id').notNull(),
+  data: text('data').notNull(),
+  action: text('action').notNull().default('update'), // 'initial' | 'update' | 'reset'
+  createdBy: text('created_by'),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
 export type Leader = typeof leaders.$inferSelect;
 export type NewLeader = typeof leaders.$inferInsert;
 export type Application = typeof applications.$inferSelect;
 export type NewApplication = typeof applications.$inferInsert;
+export type SiteContentRecord = typeof siteContent.$inferSelect;
+export type ContentRevisionRecord = typeof contentRevisions.$inferSelect;
