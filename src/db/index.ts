@@ -17,20 +17,49 @@ const DEFAULT_AVATARS = [
   'https://api.dicebear.com/7.x/avataaars/svg?seed=leader6',
 ];
 
+export function isProduction(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
+
+export function isBuildPhase(): boolean {
+  return process.env.NEXT_PHASE === 'phase-production-build';
+}
+
+/**
+ * Returns a libSQL client instance.
+ * Lazy initialized to prevent eager connection errors during build.
+ */
 export function getClient(): Client {
   if (_client) return _client;
 
   const url = process.env.TURSO_CONNECTION_URL;
   const authToken = process.env.TURSO_AUTH_TOKEN;
 
-  if (url) {
-    _client = createClient({ url, authToken: authToken ?? undefined });
-  } else {
-    _client = createClient({ url: ':memory:' });
+  if (url && authToken) {
+    _client = createClient({ url, authToken });
+    return _client;
   }
+
+  // During build phase or dev fallback
+  if (isProduction() && !isBuildPhase()) {
+    throw new Error(
+      'Database configuration missing. TURSO_CONNECTION_URL and TURSO_AUTH_TOKEN must be set in production.'
+    );
+  }
+
+  if (!isProduction()) {
+    console.warn(
+      '[DEV ONLY] TURSO_CONNECTION_URL is not set. Using temporary in-memory database for local testing.'
+    );
+  }
+
+  _client = createClient({ url: ':memory:' });
   return _client;
 }
 
+/**
+ * Returns the Drizzle ORM instance.
+ */
 export function getDb(): DrizzleDB {
   if (_db) return _db;
   const client = getClient();
@@ -39,8 +68,8 @@ export function getDb(): DrizzleDB {
 }
 
 /**
- * Ensures the required tables and initial 6 leader slots exist in Turso or in-memory DB.
- * Runs once per server process and caches the promise.
+ * Ensures the required tables and initial 6 leader slots exist.
+ * Concurrency-safe initialization that runs once per process.
  */
 export async function ensureDbInitialized(): Promise<void> {
   if (_initPromise) return _initPromise;
@@ -73,22 +102,22 @@ export async function ensureDbInitialized(): Promise<void> {
           profile_image TEXT NOT NULL,
           status TEXT DEFAULT 'pending' NOT NULL,
           leader_id INTEGER REFERENCES leaders(id),
+          admin_notes TEXT,
           created_at INTEGER NOT NULL,
           updated_at INTEGER NOT NULL
         );
       `);
 
-      // 3. Ensure any missing columns if existing table had old schema
+      // 3. Ensure any missing columns if existing table had older schema
       try {
         await client.execute('ALTER TABLE applications ADD COLUMN profile_image TEXT');
-      } catch {
-        // column already exists
-      }
+      } catch {}
+      try {
+        await client.execute('ALTER TABLE applications ADD COLUMN admin_notes TEXT');
+      } catch {}
       try {
         await client.execute('ALTER TABLE leaders ADD COLUMN position INTEGER');
-      } catch {
-        // column already exists
-      }
+      } catch {}
 
       // 4. Seed the 6 default leader slots if table has 0 rows
       const countRes = await client.execute('SELECT COUNT(*) as c FROM leaders');
@@ -107,12 +136,16 @@ export async function ensureDbInitialized(): Promise<void> {
       }
     } catch (err) {
       console.error('Failed to initialize database schema:', err);
+      throw err;
     }
   })();
 
   return _initPromise;
 }
 
+/**
+ * Proxy export for `db` so existing code continues to work seamlessly.
+ */
 export const db = new Proxy({} as DrizzleDB, {
   get(_target, prop, receiver) {
     if (prop === 'then' || typeof prop === 'symbol' || prop === 'toJSON') {

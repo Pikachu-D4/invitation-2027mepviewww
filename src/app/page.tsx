@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Mail, MessageSquare, Send, Menu, X } from "lucide-react";
 import { toast } from "sonner";
 
-const TARGET_DATE = new Date("2026-01-01T00:00:00");
+const TARGET_DATE = new Date("2027-01-01T00:00:00+05:30");
 
 type Leader = {
   id: number;
@@ -366,7 +366,7 @@ function Navbar({ filled, total }: {filled: number;total: number;}) {
     <div className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-[rgba(255,255,255,0.6)] bg-[rgba(255,255,255,0.6)] border-b border-[rgba(255,255,255,0.3)]">
       <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
         <a href="#hero" className="font-extrabold tracking-wide" style={{ fontFamily: "Cinzel, serif" }}>
-          <span className="glow-text-gold">MEP</span> <span className="glow-text-blue">2026</span>
+          <span className="glow-text-gold">MEP</span> <span className="glow-text-blue">2027</span>
         </a>
         
         {/* Desktop Navigation */}
@@ -486,12 +486,12 @@ function Hero({ timeLeft, celebrate }: {timeLeft: {days: number;hours: number;mi
           <div className="relative z-10 text-center">
             <motion.h1 initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} viewport={{ once: true }}
             className="text-4xl md:text-6xl font-extrabold leading-tight mb-6">
-              <span className="block glass-text-charcoal shimmer" style={{ fontFamily: "Cinzel, serif" }}>New Year 2026</span>
+              <span className="block glass-text-charcoal shimmer" style={{ fontFamily: "Cinzel, serif" }}>New Year 2027</span>
               <span className="block glass-text-pastel-blue shimmer" style={{ fontFamily: "Cinzel, serif" }}>MEP Invitation</span>
             </motion.h1>
             <motion.p initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.8 }} viewport={{ once: true }}
             className="mb-8 text-base md:text-lg text-[#333333] max-w-2xl mx-auto">
-              Celebrate progress, leadership, and community.You are invited to join New Year 2026 AMV Mep.
+              Celebrate progress, leadership, and community. You are invited to join New Year 2027 AMV MEP.
             </motion.p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10">
               <a href="#apply"><Button size="lg" className="liquid-button text-black shadow-[0_8px_32px_0_rgba(167,216,255,0.1)] hover:shadow-[0_8px_32px_0_rgba(167,216,255,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)]" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(167,216,255,0.6))' }}>Apply as Leader</Button></a>
@@ -925,9 +925,9 @@ function SectionWithParallax({ children }: {children: React.ReactNode;}) {
 
 function About() {
   const [typedText, setTypedText] = useState('');
-  const fullText = `🎬 2026 Mega AMV New Year MEP: Call for Leaders & Co-Leaders! 🎬
+  const fullText = `🎬 2027 Mega AMV New Year MEP: Call for Leaders & Co-Leaders! 🎬
 
-We're kicking off the 2026 New Year with a  MEP (Multi Editor Project) and we want you to be part of it!
+We're kicking off the 2027 New Year with a MEP (Multi Editor Project) and we want you to be part of it!
 
 This ambitious project will unite 30 driven editors, working together in squads to create something unforgettable. Each squad will consist of:
 
@@ -945,7 +945,7 @@ Each leader and co-leader will be:
 ~Responsible for communication, quality control, and team motivation
 ~Collaborating closely with their co-leader/leader for smooth execution
 
-If you're passionate about editing, experienced in leadership, and ready to kick off 2026 with creativity and teamwork...
+If you're passionate about editing, experienced in leadership, and ready to kick off 2027 with creativity and teamwork...
 
 👉 Fill out the Application Form below.`;
 
@@ -972,7 +972,7 @@ If you're passionate about editing, experienced in leadership, and ready to kick
 
         <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {[{
-            title: 'Vision', text: "To celebrate New Year 2026 with leaders and squads who combine artistry, teamwork, and energy shaping the ultimate AMV MEP."
+            title: 'Vision', text: "To celebrate New Year 2027 with leaders and squads who combine artistry, teamwork, and energy shaping the ultimate AMV MEP."
           }, {
             title: 'Structure', text: "3 Leaders + 3 Co-Leaders working together to guide 6 squads with clear deadlines and progress monitoring."
           }, {
@@ -1243,7 +1243,7 @@ function ApplicationForm(props: {
               </div>
               <div>
                 <label className="text-sm">Short Bio</label>
-                <Textarea value={bio} onChange={(e) => onBio(e.target.value)} placeholder="Share highlights, goals, and what you hope to build in 2026" rows={5} className="mt-1 bg-white/60" />
+                <Textarea value={bio} onChange={(e) => onBio(e.target.value)} placeholder="Share highlights, goals, and what you hope to build in 2027" rows={5} className="mt-1 bg-white/60" />
               </div>
               <Button type="submit" disabled={submitting} className="w-full text-black hover:brightness-105" style={{ backgroundImage: 'linear-gradient(135deg,#D7C4F3,#A7D8FF)' }}>
                 {submitting ? "Submitting..." : "Submit Application"}
@@ -1352,7 +1352,7 @@ function Footer() {
   return (
     <footer className="border-t bg-[rgba(255,255,255,0.6)] backdrop-blur">
       <div className="mx-auto max-w-6xl px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p className="text-sm text-muted-foreground">© 2025 MEP — New Year 2026 Invitation</p>
+        <p className="text-sm text-muted-foreground">© 2026–2027 MEP — New Year 2027 Invitation</p>
         <div className="text-xs text-muted-foreground flex items-center gap-4">
           <a href="/privacy" className="hover:underline">Privacy Policy</a>
           <span>•</span>

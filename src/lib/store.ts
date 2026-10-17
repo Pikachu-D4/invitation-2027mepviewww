@@ -17,6 +17,7 @@ export type SubmittedApplication = {
   bio: string | null;
   profileImage: string;
   status: string;
+  adminNotes?: string | null;
   leaderId: number | null;
   createdAt: Date;
   updatedAt: Date;
@@ -136,6 +137,24 @@ export const memoryStore = {
 
     store.applications.push(application);
     return { application: { ...application }, leader: { ...openLeader } };
+  },
+
+  updateApplication(
+    id: number,
+    updates: { status?: string; adminNotes?: string | null }
+  ): SubmittedApplication | null {
+    const store = getStore();
+    const app = store.applications.find((a) => a.id === id);
+    if (!app) return null;
+
+    if (updates.status !== undefined) {
+      app.status = updates.status;
+    }
+    if (updates.adminNotes !== undefined) {
+      app.adminNotes = updates.adminNotes;
+    }
+    app.updatedAt = new Date();
+    return { ...app };
   },
 
   deleteApplication(id: number): boolean {

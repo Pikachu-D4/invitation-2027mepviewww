@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db, ensureDbInitialized } from '@/db';
-import { leaders } from '@/db/schema';
+import { applications, leaders } from '@/db/schema';
 import { asc, eq } from 'drizzle-orm';
 import { isAdminRequest } from '@/lib/admin-auth';
 import { memoryStore } from '@/lib/store';
@@ -29,9 +29,15 @@ export async function GET() {
     }
   } catch (error) {
     console.error('Error fetching leaders from DB:', error);
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { error: 'Database unavailable.' },
+        { status: 503, headers: NO_CACHE_HEADERS }
+      );
+    }
   }
 
-  // Fallback if DB is unavailable
+  // Development/Test fallback
   return NextResponse.json(memoryStore.getLeaders(), {
     status: 200,
     headers: NO_CACHE_HEADERS,
@@ -60,6 +66,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(createdLeaders, { status: 201, headers: NO_CACHE_HEADERS });
   } catch (error) {
     console.error('Error in leaders POST:', error);
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json({ error: 'Failed to seed leaders in production database.' }, { status: 500 });
+    }
     return NextResponse.json(memoryStore.getLeaders(), { status: 201, headers: NO_CACHE_HEADERS });
   }
 }
@@ -71,7 +80,14 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    const { position } = await request.json();
+    let body: any;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON.' }, { status: 400 });
+    }
+
+    const { position } = body || {};
 
     if (typeof position !== 'number' || position < 1 || position > 6) {
       return NextResponse.json(
@@ -82,6 +98,13 @@ export async function PATCH(request: NextRequest) {
 
     await ensureDbInitialized();
     const currentTimestamp = new Date();
+
+    const leaderToReset = await db
+      .select()
+      .from(leaders)
+      .where(eq(leaders.position, position))
+      .limit(1);
+
     const updated = await db
       .update(leaders)
       .set({
@@ -93,6 +116,16 @@ export async function PATCH(request: NextRequest) {
       .where(eq(leaders.position, position))
       .returning();
 
+    // Disassociate application linked to this slot if any
+    if (leaderToReset.length > 0) {
+      await db
+        .update(applications)
+        .set({ leaderId: null, updatedAt: currentTimestamp })
+        .where(eq(applications.leaderId, leaderToReset[0].id));
+    }
+
+    memoryStore.resetLeader(position);
+
     if (updated.length > 0) {
       return NextResponse.json(updated[0], { status: 200, headers: NO_CACHE_HEADERS });
     }
@@ -100,7 +133,13 @@ export async function PATCH(request: NextRequest) {
     const resetSlot = memoryStore.resetLeader(position);
     return NextResponse.json(resetSlot, { status: 200, headers: NO_CACHE_HEADERS });
   } catch (error) {
-    console.error('PATCH error:', error);
+    console.error('PATCH leader reset error:', error);
+    if (process.env.NODE_ENV === 'production') {
+      return NextResponse.json(
+        { error: 'Failed to reset leader slot in database.' },
+        { status: 500 }
+      );
+    }
     return NextResponse.json(
       { error: 'Could not reset leader slot', code: 'SERVER_ERROR' },
       { status: 500 },

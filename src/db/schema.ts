@@ -4,7 +4,9 @@ export const leaders = sqliteTable('leaders', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   name: text('name'),
   role: text('role'),
-  avatar: text('avatar').notNull().default('https://slelguoygbfzlpylpxfs.supabase.co/storage/v1/object/public/project-uploads/96c226f6-c7a6-4eb3-bbf0-aa79c41cf636/generated_images/professional-business-avatar-silhouette--4321d5e4-20251223140551.jpg'),
+  avatar: text('avatar')
+    .notNull()
+    .default('https://api.dicebear.com/7.x/avataaars/svg?seed=default'),
   status: text('status').notNull().default('open'),
   position: integer('position').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -18,8 +20,14 @@ export const applications = sqliteTable('applications', {
   whatsapp: text('whatsapp').notNull(),
   bio: text('bio'),
   profileImage: text('profile_image').notNull(),
-  status: text('status').notNull().default('pending'),
+  status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'rejected'
   leaderId: integer('leader_id').references(() => leaders.id),
+  adminNotes: text('admin_notes'),
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
+
+export type Leader = typeof leaders.$inferSelect;
+export type NewLeader = typeof leaders.$inferInsert;
+export type Application = typeof applications.$inferSelect;
+export type NewApplication = typeof applications.$inferInsert;

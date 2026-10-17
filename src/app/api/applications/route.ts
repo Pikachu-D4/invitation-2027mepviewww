@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db, ensureDbInitialized } from '@/db';
+import { db, getClient, ensureDbInitialized, isProduction } from '@/db';
 import { applications, leaders } from '@/db/schema';
-import { eq, desc, asc } from 'drizzle-orm';
+import { eq, desc, asc, like, or } from 'drizzle-orm';
 import { isAdminRequest } from '@/lib/admin-auth';
 import { memoryStore } from '@/lib/store';
 
@@ -13,31 +13,64 @@ const NO_CACHE_HEADERS = {
   'Vercel-CDN-Cache-Control': 'no-store',
 };
 
+const DEFAULT_AVATARS = [
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=leader1',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=leader2',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=leader3',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=leader4',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=leader5',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=leader6',
+];
+
 export async function GET(request: NextRequest) {
+  // Public users must NEVER access private applicant contact info
   if (!isAdminRequest(request)) {
-    return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'Unauthorized. Admin credentials required to view applications.' },
+      { status: 401 }
+    );
   }
 
   try {
     await ensureDbInitialized();
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(parseInt(searchParams.get('limit') ?? '50'), 100);
-    const offset = parseInt(searchParams.get('offset') ?? '0');
+    const limit = Math.min(parseInt(searchParams.get('limit') ?? '100'), 200);
+    const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0'));
     const status = searchParams.get('status');
+    const search = searchParams.get('search')?.trim();
 
-    const baseQuery = db.select().from(applications);
-    const filteredQuery = status
-      ? baseQuery.where(eq(applications.status, status as any))
-      : baseQuery;
+    let query = db.select().from(applications).$dynamic();
 
-    const results = await filteredQuery
+    if (status && status !== 'all') {
+      query = query.where(eq(applications.status, status));
+    }
+
+    if (search) {
+      const pattern = `%${search}%`;
+      query = query.where(
+        or(
+          like(applications.name, pattern),
+          like(applications.email, pattern),
+          like(applications.whatsapp, pattern)
+        )
+      );
+    }
+
+    const results = await query
       .orderBy(desc(applications.createdAt))
       .limit(limit)
       .offset(offset);
 
     return NextResponse.json(results, { status: 200, headers: NO_CACHE_HEADERS });
   } catch (error) {
-    console.error('Error fetching applications from DB:', error);
+    console.error('Error fetching applications:', error);
+    if (isProduction()) {
+      return NextResponse.json(
+        { error: 'Failed to retrieve applications from persistent database.' },
+        { status: 500, headers: NO_CACHE_HEADERS }
+      );
+    }
+    // Dev fallback only
     return NextResponse.json(memoryStore.getApplications(), { status: 200, headers: NO_CACHE_HEADERS });
   }
 }
@@ -59,30 +92,50 @@ export async function POST(request: NextRequest) {
     const bio = formData.get('bio') as string | null;
     const profileImageFile = formData.get('profileImage') as File | null;
 
-    if (!name || typeof name !== 'string' || name.trim() === '') {
-      return NextResponse.json({ error: 'Name is required', code: 'MISSING_NAME' }, { status: 400 });
+    // Strict input validation
+    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+      return NextResponse.json(
+        { error: 'Full name is required (minimum 2 characters)', code: 'MISSING_NAME' },
+        { status: 400 }
+      );
     }
 
-    if (!email || typeof email !== 'string' || email.trim() === '') {
-      return NextResponse.json({ error: 'Email is required', code: 'MISSING_EMAIL' }, { status: 400 });
+    if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      return NextResponse.json(
+        { error: 'Valid email address is required', code: 'INVALID_EMAIL' },
+        { status: 400 }
+      );
     }
 
-    if (!whatsapp || typeof whatsapp !== 'string' || whatsapp.trim() === '') {
-      return NextResponse.json({ error: 'WhatsApp is required', code: 'MISSING_WHATSAPP' }, { status: 400 });
+    if (!whatsapp || typeof whatsapp !== 'string' || whatsapp.trim().length < 6) {
+      return NextResponse.json(
+        { error: 'WhatsApp contact number is required', code: 'MISSING_WHATSAPP' },
+        { status: 400 }
+      );
     }
 
     if (!profileImageFile) {
-      return NextResponse.json({ error: 'Profile image is required', code: 'MISSING_IMAGE' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Profile image is required before submission', code: 'MISSING_IMAGE' },
+        { status: 400 }
+      );
     }
 
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(profileImageFile.type)) {
-      return NextResponse.json({ error: 'Profile image must be JPG, JPEG, or PNG', code: 'INVALID_IMAGE_TYPE' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Profile image must be JPG, JPEG, PNG, or WEBP', code: 'INVALID_IMAGE_TYPE' },
+        { status: 400 }
+      );
     }
 
-    const maxSize = 5 * 1024 * 1024; // Up to 5MB (frontend compresses it, but allow up to 5MB)
+    // Limit to 5MB max
+    const maxSize = 5 * 1024 * 1024;
     if (profileImageFile.size > maxSize) {
-      return NextResponse.json({ error: 'Profile image must be smaller than 5 MB', code: 'IMAGE_TOO_LARGE' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Profile image must be smaller than 5 MB', code: 'IMAGE_TOO_LARGE' },
+        { status: 400 }
+      );
     }
 
     const arrayBuffer = await profileImageFile.arrayBuffer();
@@ -90,71 +143,84 @@ export async function POST(request: NextRequest) {
     const base64 = buffer.toString('base64');
     const dataUrl = `data:${profileImageFile.type};base64,${base64}`;
 
-    const sanitizedName = name.trim();
-    const sanitizedEmail = email.trim().toLowerCase();
-    const sanitizedWhatsapp = whatsapp.trim();
-    const sanitizedBio = bio ? bio.trim() : null;
+    const sanitizedName = name.trim().slice(0, 100);
+    const sanitizedEmail = email.trim().toLowerCase().slice(0, 150);
+    const sanitizedWhatsapp = whatsapp.trim().slice(0, 30);
+    const sanitizedBio = bio ? bio.trim().slice(0, 1000) : null;
 
     await ensureDbInitialized();
+    const client = getClient();
+    const now = Date.now();
 
-    // Query open leader slot directly from database
-    const openLeaders = await db
-      .select()
-      .from(leaders)
-      .where(eq(leaders.status, 'open'))
-      .orderBy(asc(leaders.position))
-      .limit(1);
-
-    if (openLeaders.length === 0) {
-      return NextResponse.json({ error: 'All leader slots are filled', code: 'NO_OPEN_SLOTS' }, { status: 400 });
-    }
-
-    const openLeader = openLeaders[0];
-    const now = new Date();
-    const assignedRole = openLeader.position <= 3 ? 'Leader' : 'Co-Leader';
-
-    // Insert application record
-    const newApplication = await db
-      .insert(applications)
-      .values({
-        name: sanitizedName,
-        email: sanitizedEmail,
-        whatsapp: sanitizedWhatsapp,
-        bio: sanitizedBio,
-        profileImage: dataUrl,
-        status: 'pending',
-        leaderId: openLeader.id,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning();
-
-    // Update leader slot with new avatar and name
-    await db
-      .update(leaders)
-      .set({
-        name: sanitizedName,
-        role: assignedRole,
-        avatar: dataUrl,
-        status: 'filled',
-        updatedAt: now,
-      })
-      .where(eq(leaders.id, openLeader.id));
-
-    // Also mirror to memoryStore as a safety backup
-    memoryStore.addApplication({
-      name: sanitizedName,
-      email: sanitizedEmail,
-      whatsapp: sanitizedWhatsapp,
-      bio: sanitizedBio,
-      profileImage: dataUrl,
+    // Concurrency-safe atomic slot claim:
+    // Update the lowest position slot that is currently open, and return the row in one atomic statement
+    const claimResult = await client.execute({
+      sql: `UPDATE leaders 
+            SET name = ?, avatar = ?, status = 'filled', updated_at = ? 
+            WHERE id = (
+              SELECT id FROM leaders 
+              WHERE status = 'open' 
+              ORDER BY position ASC 
+              LIMIT 1
+            ) 
+            RETURNING *;`,
+      args: [sanitizedName, dataUrl, now],
     });
 
-    return NextResponse.json(newApplication[0], { status: 201, headers: NO_CACHE_HEADERS });
+    if (claimResult.rows.length === 0) {
+      return NextResponse.json(
+        { error: 'All 6 leader slots are currently filled. Thank you for your interest!', code: 'NO_OPEN_SLOTS' },
+        { status: 400 }
+      );
+    }
+
+    const claimedLeader = claimResult.rows[0];
+    const leaderId = Number(claimedLeader.id);
+
+    try {
+      // Insert the application linked to this claimed leader slot
+      const appResult = await client.execute({
+        sql: `INSERT INTO applications (name, email, whatsapp, bio, profile_image, status, leader_id, created_at, updated_at)
+              VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?)
+              RETURNING *;`,
+        args: [sanitizedName, sanitizedEmail, sanitizedWhatsapp, sanitizedBio, dataUrl, leaderId, now, now],
+      });
+
+      const newApp = appResult.rows[0];
+
+      return NextResponse.json(
+        {
+          success: true,
+          applicationId: newApp.id,
+          assignedSlot: {
+            id: leaderId,
+            position: claimedLeader.position,
+            role: claimedLeader.role,
+          },
+        },
+        { status: 201, headers: NO_CACHE_HEADERS }
+      );
+    } catch (insertError) {
+      console.error('Failed to insert application record, rolling back slot claim:', insertError);
+
+      // Rollback the leader slot back to open status so it isn't orphaned
+      const position = Number(claimedLeader.position);
+      const defaultAvatar = DEFAULT_AVATARS[position - 1] || 'https://api.dicebear.com/7.x/avataaars/svg?seed=default';
+
+      await client.execute({
+        sql: `UPDATE leaders SET name = NULL, avatar = ?, status = 'open', updated_at = ? WHERE id = ?;`,
+        args: [defaultAvatar, Date.now(), leaderId],
+      });
+
+      throw insertError;
+    }
   } catch (error) {
-    console.error('POST application error:', error);
+    console.error('POST application fatal error:', error);
     return NextResponse.json(
-      { error: 'Internal server error: ' + (error as Error).message },
+      {
+        error: error instanceof Error ? error.message : 'Could not process application at this time.',
+        code: 'SUBMISSION_FAILED',
+      },
       { status: 500 }
     );
   }

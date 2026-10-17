@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const metadata = {
-  title: "Privacy Policy - MEP 2026",
-  description: "Privacy policy for MEP 2026 New Year MEP application process",
+  title: "Privacy Policy - MEP 2027",
+  description: "Privacy policy for MEP 2027 New Year MEP application process",
 };
 
 export default function PrivacyPage() {
@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-[rgba(255,255,255,0.6)] bg-[rgba(255,255,255,0.6)] border-b border-[rgba(255,255,255,0.3)]">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
           <Link href="/" className="font-extrabold tracking-wide" style={{ fontFamily: "Cinzel, serif" }}>
-            <span className="glow-text-gold">MEP</span> <span className="glow-text-blue">2026</span>
+            <span className="glow-text-gold">MEP</span> <span className="glow-text-blue">2027</span>
           </Link>
           <Link href="/">
             <Button variant="outline" className="glass-button border-[rgba(51,51,51,0.2)] text-[#333333]">
@@ -32,13 +32,13 @@ export default function PrivacyPage() {
               Privacy Policy
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-2" style={{ color: '#555555' }}>
-              Last Updated: November 25, 2025
+              Last Updated: January 2026
             </p>
           </CardHeader>
           <CardContent className="space-y-6 text-[#333333]">
             <section>
               <h2 className="text-xl font-semibold mb-3" style={{ fontFamily: "Cinzel, serif" }}>1. Information We Collect</h2>
-              <p className="mb-2">When you apply as a Leader or Co-Leader for MEP 2026, we collect:</p>
+              <p className="mb-2">When you apply as a Leader or Co-Leader for MEP 2027, we collect:</p>
               <ul className="list-disc list-inside space-y-1 ml-4">
                 <li>Full Name</li>
                 <li>Email Address</li>
@@ -62,8 +62,8 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-xl font-semibold mb-3" style={{ fontFamily: "Cinzel, serif" }}>3. Data Storage and Security</h2>
               <p>
-                Your data is stored securely in our database. Profile pictures are stored as base64-encoded data. 
-                We implement reasonable security measures to protect your personal information from unauthorized access, 
+                Your data is stored securely in our database. Profile pictures are stored as optimized base64-encoded images. 
+                We implement strict security measures to protect your personal information from unauthorized access, 
                 alteration, disclosure, or destruction.
               </p>
             </section>
@@ -103,7 +103,7 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-xl font-semibold mb-3" style={{ fontFamily: "Cinzel, serif" }}>7. Changes to This Policy</h2>
               <p>
-                We may update this Privacy Policy from time to time. The "Last Updated" date at the top will reflect 
+                We may update this Privacy Policy from time to time. The &quot;Last Updated&quot; date at the top will reflect 
                 the most recent changes. We encourage you to review this policy periodically.
               </p>
             </section>
@@ -121,7 +121,7 @@ export default function PrivacyPage() {
       {/* Footer */}
       <footer className="border-t bg-[rgba(255,255,255,0.6)] backdrop-blur mt-16">
         <div className="mx-auto max-w-6xl px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-sm text-muted-foreground">© 2025 MEP — New Year 2026 Invitation</p>
+          <p className="text-sm text-muted-foreground">© 2026–2027 MEP — New Year 2027 Invitation</p>
           <div className="text-xs text-muted-foreground">
             <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
           </div>
