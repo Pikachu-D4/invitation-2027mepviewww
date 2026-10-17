@@ -677,7 +677,7 @@ function Hero({
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 1, ease: "easeOut" }}
-          className="mx-auto max-w-4xl p-8 md:p-12 rounded-3xl glass-panel bg-[rgba(255,255,255,0.15)] border-[rgba(255,255,255,0.3)] backdrop-blur-3xl shadow-2xl overflow-hidden relative z-10"
+          className="mx-auto max-w-4xl p-5 sm:p-8 md:p-12 rounded-2xl sm:rounded-3xl glass-panel bg-[rgba(255,255,255,0.15)] border-[rgba(255,255,255,0.3)] backdrop-blur-3xl shadow-2xl overflow-hidden relative z-10"
           style={{
             boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
           }}>
@@ -711,19 +711,19 @@ function Hero({
             </motion.h1>
 
             <motion.p initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.8 }} viewport={{ once: true }}
-            className="mb-8 text-base md:text-lg text-[#333333] max-w-2xl mx-auto leading-relaxed">
+            className="mb-6 sm:mb-8 text-sm sm:text-base md:text-lg text-[#333333] max-w-2xl mx-auto leading-relaxed px-1 sm:px-0">
               {hero.subtitle}
             </motion.p>
 
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10 relative z-20">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-8 sm:mb-10 relative z-20 w-full max-w-xs sm:max-w-none mx-auto">
               {hero.primaryCtaLabel && (
                 <Button
                   asChild
                   size="lg"
-                  className="liquid-button text-black shadow-[0_8px_32px_0_rgba(167,216,255,0.1)] hover:shadow-[0_8px_32px_0_rgba(167,216,255,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)] cursor-pointer"
+                  className="w-full sm:w-auto min-w-[210px] sm:min-w-0 liquid-button text-black shadow-[0_8px_32px_0_rgba(167,216,255,0.1)] hover:shadow-[0_8px_32px_0_rgba(167,216,255,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)] cursor-pointer justify-center text-center font-semibold"
                   style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(167,216,255,0.6))' }}
                 >
-                  <a href={hero.primaryCtaLink || "#apply"} onClick={onApplyAsLeader} id="hero-apply-leader-btn">
+                  <a href={hero.primaryCtaLink || "#apply"} onClick={onApplyAsLeader} id="hero-apply-leader-btn" className="w-full text-center">
                     {hero.primaryCtaLabel}
                   </a>
                 </Button>
@@ -732,10 +732,10 @@ function Hero({
                 <Button
                   asChild
                   size="lg"
-                  className="liquid-button text-[#333333] shadow-[0_8px_32px_0_rgba(215,196,243,0.1)] hover:shadow-[0_8px_32px_0_rgba(215,196,243,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)] cursor-pointer"
+                  className="w-full sm:w-auto min-w-[210px] sm:min-w-0 liquid-button text-[#333333] shadow-[0_8px_32px_0_rgba(215,196,243,0.1)] hover:shadow-[0_8px_32px_0_rgba(215,196,243,0.3)] backdrop-blur-md border-[rgba(255,255,255,0.2)] cursor-pointer justify-center text-center font-semibold"
                   style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.8), rgba(215,196,243,0.6))' }}
                 >
-                  <a href={hero.secondaryCtaLink || "#apply"} onClick={onApplyAsCoLeader} id="hero-apply-coleader-btn">
+                  <a href={hero.secondaryCtaLink || "#apply"} onClick={onApplyAsCoLeader} id="hero-apply-coleader-btn" className="w-full text-center">
                     {hero.secondaryCtaLabel}
                   </a>
                 </Button>
@@ -745,9 +745,9 @@ function Hero({
                   asChild
                   variant="outline"
                   size="lg"
-                  className="glass-button border-[rgba(51,51,51,0.2)] text-[#333333] hover:bg-[rgba(255,255,255,0.5)] hover:shadow-[0_4px_16px_0_rgba(51,51,51,0.1)] backdrop-blur-md cursor-pointer"
+                  className="w-full sm:w-auto min-w-[210px] sm:min-w-0 glass-button border-[rgba(51,51,51,0.2)] text-[#333333] hover:bg-[rgba(255,255,255,0.5)] hover:shadow-[0_4px_16px_0_rgba(51,51,51,0.1)] backdrop-blur-md cursor-pointer justify-center text-center font-semibold"
                 >
-                  <a href={hero.learnMoreLink || "#about"} onClick={onLearnMore} id="hero-learn-more-btn">
+                  <a href={hero.learnMoreLink || "#about"} onClick={onLearnMore} id="hero-learn-more-btn" className="w-full text-center">
                     {hero.learnMoreLabel}
                   </a>
                 </Button>
@@ -763,31 +763,32 @@ function Hero({
                 className="max-w-xl mx-auto">
 
                 <motion.div
-                  className="text-center mb-6"
+                  className="text-center mb-4 sm:mb-6"
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}>
 
                   <span
-                    className="text-xl md:text-2xl text-[#333333] glass-text-charcoal"
+                    className="text-lg sm:text-xl md:text-2xl text-[#333333] glass-text-charcoal font-semibold"
                     style={{ fontFamily: "Inter, sans-serif" }}>
                     {event.countdownHeading}
                   </span>
                 </motion.div>
                 <motion.div
-                  className="glass-panel p-4 rounded-xl bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.2)] backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.1)] overflow-hidden"
+                  className="glass-panel p-2.5 sm:p-4 rounded-2xl bg-[rgba(255,255,255,0.1)] border-[rgba(255,255,255,0.2)] backdrop-blur-xl shadow-[0_8px_32px_0_rgba(0,0,0,0.1)] overflow-hidden"
                   whileHover={{ scale: 1.01 }}
                   transition={{ duration: 0.3 }}>
 
-                  <div className="liquid-bg"></div>
-                  <div className="grid grid-cols-4 gap-3 sm:gap-6 relative z-10">
+                  <div className="liquid-bg pointer-events-none"></div>
+                  <div className="grid grid-cols-4 gap-1.5 sm:gap-3 md:gap-6 relative z-10">
                     {(['days', 'hours', 'minutes', 'seconds'] as const).map((unit) => {
                       const value = timeLeft[unit];
                       const label = unit.charAt(0).toUpperCase() + unit.slice(1);
+                      const shortLabel = unit === 'days' ? 'Days' : unit === 'hours' ? 'Hours' : unit === 'minutes' ? 'Mins' : 'Secs';
                       return (
-                        <motion.div key={unit} className="glass-panel group" whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
-                          <Card className="relative bg-[rgba(255,255,255,0.6)] border-[rgba(255,255,255,0.3)] backdrop-blur-xl shadow-[0_4px_16px_0_rgba(0,0,0,0.1)] overflow-hidden">
-                            <CardContent className="p-4 text-center relative z-10">
+                        <motion.div key={unit} className="glass-panel group rounded-xl overflow-hidden" whileHover={{ scale: 1.02 }} transition={{ duration: 0.2 }}>
+                          <Card className="relative bg-[rgba(255,255,255,0.6)] border-[rgba(255,255,255,0.3)] backdrop-blur-xl shadow-[0_4px_16px_0_rgba(0,0,0,0.1)] overflow-hidden rounded-xl border">
+                            <CardContent className="p-2 sm:p-4 text-center relative z-10 flex flex-col items-center justify-center">
                               <AnimatePresence mode="wait">
                                 <motion.div
                                   key={value}
@@ -795,13 +796,16 @@ function Hero({
                                   animate={{ y: 0, opacity: 1 }}
                                   exit={{ y: -50, opacity: 0 }}
                                   transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                                  className="text-3xl font-bold text-[#333333] drop-shadow-md"
+                                  className="text-xl sm:text-2xl md:text-3xl font-bold text-[#333333] drop-shadow-xs leading-none"
                                   style={{ fontFamily: "Cinzel, serif" }}>
 
                                   {value.toString().padStart(2, '0')}
                                 </motion.div>
                               </AnimatePresence>
-                              <div className="text-xs uppercase tracking-widest text-[#555555] mt-1">{label}</div>
+                              <div className="text-[10px] sm:text-xs uppercase tracking-normal sm:tracking-wider text-[#555555] mt-1.5 font-semibold truncate w-full text-center">
+                                <span className="hidden sm:inline">{label}</span>
+                                <span className="sm:hidden">{shortLabel}</span>
+                              </div>
                             </CardContent>
                           </Card>
                         </motion.div>);
