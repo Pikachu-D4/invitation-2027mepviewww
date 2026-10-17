@@ -9,7 +9,7 @@ A production-ready Next.js application for the **MEP 2027 New Year Celebration**
 The MEP (Multi-Editor Project) 2027 platform unites 30 creators and editors organized into squads to create a collaborative New Year celebration project. The website features:
 - **Liquid-Glass Modern UI**: Ambient animated backgrounds, glassmorphism panels, countdown timer to January 1, 2027 (Asia/Kolkata timezone: `2027-01-01T00:00:00+05:30`).
 - **Dynamic Website Content Manager & Admin CMS (`/admin`)**:
-  - Fully editable **About MEP** section: headings, subheadings, editable reorderable paragraphs, squad counts, leader/co-leader responsibilities, and callout blocks.
+  - Fully editable **About MEP** section: headings, subheadings, editable reorderable paragraphs, project info cards, and callout blocks (with squad composition and responsibilities cards removed for a cleaner manifesto flow).
   - **Hero & Headline**: Main hero title, subtitle, introduction, CTA destinations, and visibility toggle.
   - **Event & Countdown**: Configurable target date, timezone, countdown description, and visibility.
   - **Announcement Banner**: Dynamic announcement banner with start/end scheduling and safe color presets (Gold, Cyan, Purple, Emerald).

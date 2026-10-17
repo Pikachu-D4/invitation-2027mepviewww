@@ -29,7 +29,7 @@ Welcome to the comprehensive technical documentation for the **MEP 2027 New Year
      - Status updates (Approve, Reject, Pending) and full deletion with linked slot recovery.
      - CSV export of applicant records.
   6. **Dynamic Website Content Manager & CMS (`/admin` → Website Content)**:
-     - **About MEP**: Edit main heading, subtitle, introduction paragraph, add/remove/reorder descriptive paragraphs, change squad counts, edit leader & co-leader responsibilities, and highlight callout text.
+     - **About MEP**: Edit main heading, subtitle, introduction paragraph, add/remove/reorder descriptive paragraphs, highlight info cards, and callout text (squad composition and responsibilities cards removed).
      - **Hero & Headline**: Edit hero title, subtitle, introduction, CTA labels/links, and visibility.
      - **Event & Countdown**: Configurable event date/time, timezone, and countdown visibility.
      - **Announcements**: Dynamic banner with scheduling (start/end dates) and 4 safe color themes.

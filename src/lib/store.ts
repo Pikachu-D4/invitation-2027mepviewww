@@ -67,7 +67,6 @@ interface MemoryStore {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __mep_store: MemoryStore | undefined;
 }
 

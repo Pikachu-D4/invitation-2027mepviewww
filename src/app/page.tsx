@@ -1063,69 +1063,6 @@ function About({ about }: { about: SiteContent['about'] }) {
           )}
         </motion.div>
 
-        {/* Squad Composition Box */}
-        <div className="p-6 rounded-2xl glass-panel bg-white/70 border border-white/60 backdrop-blur-md shadow-sm">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">
-            Squad Composition & Roles
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3.5 rounded-xl bg-amber-50/80 border border-amber-200 text-center">
-              <span className="block text-2xl font-extrabold text-amber-700">
-                {about.squadStructure.leaderCount}
-              </span>
-              <span className="text-xs font-semibold text-amber-900">Leader per Squad</span>
-            </div>
-            <div className="p-3.5 rounded-xl bg-indigo-50/80 border border-indigo-200 text-center">
-              <span className="block text-2xl font-extrabold text-indigo-700">
-                {about.squadStructure.coLeaderCount}
-              </span>
-              <span className="text-xs font-semibold text-indigo-900">Co-Leader per Squad</span>
-            </div>
-            <div className="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200 text-center">
-              <span className="block text-2xl font-extrabold text-blue-700">
-                {about.squadStructure.memberCount}
-              </span>
-              <span className="text-xs font-semibold text-blue-900">Members per Squad</span>
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 mt-3 text-center">
-            {about.squadCount} Squads in Total • {about.totalParticipants} Dedicated Video Editors
-          </p>
-        </div>
-
-        {/* Responsibilities Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="p-6 rounded-2xl glass-panel bg-white/60 border border-white/50 backdrop-blur-md shadow-sm">
-            <h4 className="text-sm font-bold uppercase tracking-wider text-amber-900 mb-3 flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500" />
-              Leader Responsibilities
-            </h4>
-            <ul className="space-y-2 text-sm text-gray-700">
-              {about.leaderResponsibilities.map((r, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="text-amber-500 font-bold">~</span>
-                  <span>{r}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <div className="p-6 rounded-2xl glass-panel bg-white/60 border border-white/50 backdrop-blur-md shadow-sm">
-            <h4 className="text-sm font-bold uppercase tracking-wider text-indigo-900 mb-3 flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
-              Co-Leader Responsibilities
-            </h4>
-            <ul className="space-y-2 text-sm text-gray-700">
-              {about.coLeaderResponsibilities.map((r, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="text-indigo-500 font-bold">~</span>
-                  <span>{r}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
         {/* Info Cards Grid (Vision, Structure, Role) */}
         {about.infoCards && about.infoCards.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-2">
