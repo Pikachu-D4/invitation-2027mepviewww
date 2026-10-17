@@ -61,7 +61,9 @@ export default function Home() {
 
   async function fetchLeaders() {
     try {
-      const response = await fetch('/api/leaders');
+      const response = await fetch(`/api/leaders?t=${Date.now()}`, {
+        cache: 'no-store',
+      });
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
@@ -69,7 +71,7 @@ export default function Home() {
         }
       }
     } catch (error) {
-      console.warn('Could not refresh leaders, using defaults:', error);
+      console.warn('Could not refresh leaders:', error);
     }
   }
 
@@ -92,8 +94,65 @@ export default function Home() {
     return { days, hours, minutes, seconds };
   }
 
-  // New: image selection handler with validation
-  function handleImageChange(file: File | null) {
+  // Compress and resize image to ~40KB so upload & display is ultra fast on all devices
+  async function compressImage(file: File): Promise<File> {
+    return new Promise((resolve) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(objectUrl);
+        const canvas = document.createElement('canvas');
+        const maxDim = 450;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          0.85
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file);
+      };
+      img.src = objectUrl;
+    });
+  }
+
+  // Image selection handler with auto-compression
+  async function handleImageChange(file: File | null) {
     setImageError(null);
     if (!file) {
       setProfileImageFile(null);
@@ -101,20 +160,29 @@ export default function Home() {
       setProfilePreview(null);
       return;
     }
-    const allowed = ['image/jpeg', 'image/jpg', 'image/png'];
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (!allowed.includes(file.type)) {
-      setImageError('Please upload a JPG or PNG image.');
+      setImageError('Please upload a JPG, JPEG, or PNG image.');
       return;
     }
-    const maxSize = 2 * 1024 * 1024; // 2MB
+    const maxSize = 10 * 1024 * 1024; // Allow up to 10MB original photo
     if (file.size > maxSize) {
-      setImageError('Image must be smaller than 2 MB.');
+      setImageError('Image must be smaller than 10 MB.');
       return;
     }
-    if (profilePreview) URL.revokeObjectURL(profilePreview);
-    const url = URL.createObjectURL(file);
-    setProfileImageFile(file);
-    setProfilePreview(url);
+
+    try {
+      const compressed = await compressImage(file);
+      if (profilePreview) URL.revokeObjectURL(profilePreview);
+      const url = URL.createObjectURL(compressed);
+      setProfileImageFile(compressed);
+      setProfilePreview(url);
+    } catch {
+      if (profilePreview) URL.revokeObjectURL(profilePreview);
+      const url = URL.createObjectURL(file);
+      setProfileImageFile(file);
+      setProfilePreview(url);
+    }
   }
 
   useEffect(() => {

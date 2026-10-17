@@ -46,7 +46,7 @@ export default function AdminPage() {
   async function fetchData() {
     try {
       setLoading(true);
-      const appsRes = await fetch("/api/applications", { cache: "no-store" });
+      const appsRes = await fetch(`/api/applications?t=${Date.now()}`, { cache: "no-store" });
       if (appsRes.status === 401) {
         setAuthenticated(false);
         setApplications([]);
@@ -56,7 +56,7 @@ export default function AdminPage() {
       if (!appsRes.ok) throw new Error("Failed to fetch applications");
 
       const appsData = await appsRes.json();
-      const leadersRes = await fetch("/api/leaders", { cache: "no-store" });
+      const leadersRes = await fetch(`/api/leaders?t=${Date.now()}`, { cache: "no-store" });
       if (!leadersRes.ok) throw new Error("Failed to fetch leader slots");
       const leadersData = await leadersRes.json();
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
+import { db, ensureDbInitialized } from '@/db';
 import { leaders } from '@/db/schema';
 import { asc, eq } from 'drizzle-orm';
 import { isAdminRequest } from '@/lib/admin-auth';
@@ -7,24 +7,35 @@ import { memoryStore } from '@/lib/store';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
-  if (process.env.TURSO_CONNECTION_URL) {
-    try {
-      const allLeaders = await db
-        .select()
-        .from(leaders)
-        .orderBy(asc(leaders.position));
+const NO_CACHE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  'CDN-Cache-Control': 'no-store',
+  'Vercel-CDN-Cache-Control': 'no-store',
+};
 
-      if (allLeaders.length > 0) {
-        return NextResponse.json(allLeaders, { status: 200 });
-      }
-    } catch (error) {
-      console.warn('DB query failed, falling back to memory store:', error);
+export async function GET() {
+  try {
+    await ensureDbInitialized();
+    const allLeaders = await db
+      .select()
+      .from(leaders)
+      .orderBy(asc(leaders.position));
+
+    if (allLeaders && allLeaders.length > 0) {
+      return NextResponse.json(allLeaders, {
+        status: 200,
+        headers: NO_CACHE_HEADERS,
+      });
     }
+  } catch (error) {
+    console.error('Error fetching leaders from DB:', error);
   }
 
-  // Self-contained store: guaranteed to return 6 leader slots
-  return NextResponse.json(memoryStore.getLeaders(), { status: 200 });
+  // Fallback if DB is unavailable
+  return NextResponse.json(memoryStore.getLeaders(), {
+    status: 200,
+    headers: NO_CACHE_HEADERS,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -32,27 +43,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
   }
 
-  if (process.env.TURSO_CONNECTION_URL) {
-    try {
-      const currentTimestamp = new Date();
-      const leaderSlots = Array.from({ length: 6 }, (_, index) => ({
-        name: null,
-        role: index < 3 ? 'Leader' : 'Co-Leader',
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=leader${index + 1}`,
-        status: 'open' as const,
-        position: index + 1,
-        createdAt: currentTimestamp,
-        updatedAt: currentTimestamp,
-      }));
+  try {
+    await ensureDbInitialized();
+    const currentTimestamp = new Date();
+    const leaderSlots = Array.from({ length: 6 }, (_, index) => ({
+      name: null,
+      role: index < 3 ? 'Leader' : 'Co-Leader',
+      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=leader${index + 1}`,
+      status: 'open' as const,
+      position: index + 1,
+      createdAt: currentTimestamp,
+      updatedAt: currentTimestamp,
+    }));
 
-      const createdLeaders = await db.insert(leaders).values(leaderSlots).returning();
-      return NextResponse.json(createdLeaders, { status: 201 });
-    } catch (error) {
-      console.warn('DB insert failed, using memory store:', error);
-    }
+    const createdLeaders = await db.insert(leaders).values(leaderSlots).returning();
+    return NextResponse.json(createdLeaders, { status: 201, headers: NO_CACHE_HEADERS });
+  } catch (error) {
+    console.error('Error in leaders POST:', error);
+    return NextResponse.json(memoryStore.getLeaders(), { status: 201, headers: NO_CACHE_HEADERS });
   }
-
-  return NextResponse.json(memoryStore.getLeaders(), { status: 201 });
 }
 
 // 🔁 Reset / clear a specific leader slot by position (1–6)
@@ -66,49 +75,34 @@ export async function PATCH(request: NextRequest) {
 
     if (typeof position !== 'number' || position < 1 || position > 6) {
       return NextResponse.json(
-        {
-          error: 'Missing or invalid position (must be 1-6)',
-          code: 'INVALID_POSITION',
-        },
+        { error: 'Missing or invalid position (must be 1-6)', code: 'INVALID_POSITION' },
         { status: 400 },
       );
     }
 
-    if (process.env.TURSO_CONNECTION_URL) {
-      try {
-        const currentTimestamp = new Date();
-        const updated = await db
-          .update(leaders)
-          .set({
-            name: null,
-            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=leader${position}`,
-            status: 'open',
-            updatedAt: currentTimestamp,
-          })
-          .where(eq(leaders.position, position))
-          .returning();
+    await ensureDbInitialized();
+    const currentTimestamp = new Date();
+    const updated = await db
+      .update(leaders)
+      .set({
+        name: null,
+        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=leader${position}`,
+        status: 'open',
+        updatedAt: currentTimestamp,
+      })
+      .where(eq(leaders.position, position))
+      .returning();
 
-        if (updated.length > 0) {
-          return NextResponse.json(updated[0], { status: 200 });
-        }
-      } catch (dbErr) {
-        console.warn('DB update failed, using memoryStore:', dbErr);
-      }
+    if (updated.length > 0) {
+      return NextResponse.json(updated[0], { status: 200, headers: NO_CACHE_HEADERS });
     }
 
     const resetSlot = memoryStore.resetLeader(position);
-    if (!resetSlot) {
-      return NextResponse.json(
-        { error: 'No leader slot found for this position', code: 'POSITION_NOT_FOUND' },
-        { status: 404 },
-      );
-    }
-
-    return NextResponse.json(resetSlot, { status: 200 });
+    return NextResponse.json(resetSlot, { status: 200, headers: NO_CACHE_HEADERS });
   } catch (error) {
     console.error('PATCH error:', error);
     return NextResponse.json(
-      { error: 'Internal server error: ' + String(error), code: 'SERVER_ERROR' },
+      { error: 'Could not reset leader slot', code: 'SERVER_ERROR' },
       { status: 500 },
     );
   }
