@@ -1492,26 +1492,25 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
                       }`}
                     >
                       {/* Visual backdrop header with circular avatar */}
-                      <div className="h-48 relative flex items-center justify-center overflow-hidden bg-slate-900/95">
+                      <div className="h-48 relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-amber-50/50 to-orange-50/30">
                         {isFilled ? (
                           <>
                             {/* Approved slot backdrop image */}
                             <img
                               src={SLOT_BACKDROPS[l.position] || `/slots/slot-${l.position}.png`}
                               alt={`Slot #${l.position} Backdrop`}
-                              className="absolute inset-0 h-full w-full object-cover transform transition-transform duration-700 ease-out group-hover:scale-110"
+                              className="absolute inset-0 h-full w-full object-cover transform transition-transform duration-700 ease-out group-hover:scale-108"
                               style={{ objectPosition: SLOT_OBJECT_POSITIONS[l.position] || 'center 20%' }}
                               loading="lazy"
                               decoding="async"
                             />
-                            {/* Cinematic multi-gradient vignette for premium contrast */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/45" />
-                            <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
-                            {/* Ambient gold glow behind avatar */}
+                            {/* Ultra-subtle light gradient: keeps artwork colors 100% vibrant */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-transparent pointer-events-none" />
+                            {/* Soft warm light glow behind avatar */}
                             <div
                               className="absolute inset-0 pointer-events-none"
                               style={{
-                                background: 'radial-gradient(circle at center, rgba(255,215,0,0.22) 0%, transparent 60%)',
+                                background: 'radial-gradient(circle at center, rgba(255,255,255,0.4) 0%, rgba(255,220,130,0.18) 40%, transparent 70%)',
                               }}
                             />
                           </>
@@ -1534,7 +1533,7 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
                           <Badge
                             className={`font-semibold tracking-wide ${
                               isFilled
-                                ? "bg-[color:var(--gold)] text-black shadow-md backdrop-blur-sm border border-amber-200/50"
+                                ? "bg-[color:var(--gold)] text-black shadow-md border border-amber-300/60"
                                 : "bg-[color:var(--gold)] text-black shadow-sm"
                             }`}
                           >
@@ -1548,7 +1547,7 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
                             variant="outline"
                             className={`text-2xs font-semibold px-2 py-0.5 rounded-full ${
                               isFilled
-                                ? "bg-black/55 text-white/95 border-white/30 backdrop-blur-md shadow-sm"
+                                ? "bg-white/85 text-gray-800 border-white/80 backdrop-blur-md shadow-xs"
                                 : "bg-white/70 text-gray-700 border-gray-300/70 backdrop-blur-sm shadow-2xs"
                             }`}
                           >
@@ -1560,7 +1559,7 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
                         <div
                           className={`relative z-10 h-32 w-32 rounded-full overflow-hidden transition-all duration-300 ${
                             isFilled
-                              ? "border-4 border-white/95 shadow-[0_12px_36px_rgba(0,0,0,0.65)] ring-2 ring-[color:var(--gold)]/80 group-hover:ring-4 group-hover:scale-105"
+                              ? "border-4 border-white shadow-[0_8px_25px_rgba(0,0,0,0.25)] ring-2 ring-[color:var(--gold)]/80 group-hover:scale-105"
                               : "border-4 border-white/60 shadow-2xl backdrop-blur-sm"
                           }`}
                         >
@@ -1628,26 +1627,25 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
                       }`}
                     >
                       {/* Visual backdrop header with circular avatar */}
-                      <div className="h-48 relative flex items-center justify-center overflow-hidden bg-slate-900/95">
+                      <div className="h-48 relative flex items-center justify-center overflow-hidden bg-gradient-to-br from-purple-50/50 to-blue-50/30">
                         {isFilled ? (
                           <>
                             {/* Approved slot backdrop image */}
                             <img
                               src={SLOT_BACKDROPS[l.position] || `/slots/slot-${l.position}.png`}
                               alt={`Slot #${l.position} Backdrop`}
-                              className="absolute inset-0 h-full w-full object-cover transform transition-transform duration-700 ease-out group-hover:scale-110"
+                              className="absolute inset-0 h-full w-full object-cover transform transition-transform duration-700 ease-out group-hover:scale-108"
                               style={{ objectPosition: SLOT_OBJECT_POSITIONS[l.position] || 'center 20%' }}
                               loading="lazy"
                               decoding="async"
                             />
-                            {/* Cinematic multi-gradient vignette for premium contrast */}
-                            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/45" />
-                            <div className="absolute inset-0 bg-gradient-to-r from-black/30 via-transparent to-black/30" />
-                            {/* Subtle silver/violet glow behind avatar */}
+                            {/* Ultra-subtle light gradient: keeps artwork colors 100% vibrant */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-transparent pointer-events-none" />
+                            {/* Soft cool light glow behind avatar */}
                             <div
                               className="absolute inset-0 pointer-events-none"
                               style={{
-                                background: 'radial-gradient(circle at center, rgba(200,210,240,0.25) 0%, transparent 60%)',
+                                background: 'radial-gradient(circle at center, rgba(255,255,255,0.4) 0%, rgba(210,215,255,0.2) 40%, transparent 70%)',
                               }}
                             />
                           </>
@@ -1670,7 +1668,7 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
                           <Badge
                             className={`font-semibold tracking-wide ${
                               isFilled
-                                ? "bg-[color:var(--silver)] text-[#222222] shadow-md backdrop-blur-sm border border-slate-200/50"
+                                ? "bg-[color:var(--silver)] text-[#222222] shadow-md border border-slate-200/80"
                                 : "bg-[color:var(--silver)] text-[#333333] shadow-sm"
                             }`}
                           >
@@ -1678,13 +1676,13 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
                           </Badge>
                         </div>
 
-                        {/* Slot position chip on top-right */}
+                        {/* Position chip on top-right */}
                         <div className="absolute top-2.5 right-2.5 z-10">
                           <Badge
                             variant="outline"
                             className={`text-2xs font-semibold px-2 py-0.5 rounded-full ${
                               isFilled
-                                ? "bg-black/55 text-white/95 border-white/30 backdrop-blur-md shadow-sm"
+                                ? "bg-white/85 text-gray-800 border-white/80 backdrop-blur-md shadow-xs"
                                 : "bg-white/70 text-gray-700 border-gray-300/70 backdrop-blur-sm shadow-2xs"
                             }`}
                           >
@@ -1696,7 +1694,7 @@ function LeadersGrid({ leaders, filled, total, loading }: {leaders: Leader[];fil
                         <div
                           className={`relative z-10 h-32 w-32 rounded-full overflow-hidden transition-all duration-300 ${
                             isFilled
-                              ? "border-4 border-white/95 shadow-[0_12px_36px_rgba(0,0,0,0.65)] ring-2 ring-[color:var(--silver)]/90 group-hover:ring-4 group-hover:scale-105"
+                              ? "border-4 border-white shadow-[0_8px_25px_rgba(0,0,0,0.25)] ring-2 ring-[color:var(--silver)]/90 group-hover:scale-105"
                               : "border-4 border-white/60 shadow-2xl backdrop-blur-sm"
                           }`}
                         >
