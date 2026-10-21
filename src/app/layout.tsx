@@ -72,11 +72,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link
-          rel="preload"
-          as="image"
-          href="https://images.unsplash.com/photo-1519681393784-d120267933ba?q=80&w=1600&auto=format&fit=crop"
-        />
+        {/* Unsplash hero bg image (opacity: 0.1) is kept in the hero section
+            but its preload was removed — it is not LCP-critical and the early
+            high-priority fetch wasted bandwidth, especially on mobile. */}
       </head>
       <body className="antialiased">
         <ErrorReporter />

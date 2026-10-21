@@ -437,7 +437,8 @@ export default function Home() {
 
       <MemoizedFooter />
 
-      <MemoizedFloatingParticles />
+      {/* FloatingParticles removed — 20 animated divs at z-index -20 were fully
+          hidden behind the page's opaque gradient and wasted compositor layers */}
 
       <style>{`html { scroll-behavior: smooth; }`}</style>
     </div>);
@@ -963,18 +964,10 @@ function GoldenSparkles({ celebrate }: {celebrate: boolean;}) {
   return null;
 }
 
-// Confetti burst on celebration and continuous subtle drift
+// Confetti burst on celebration (the 50 continuous falling pieces were removed —
+// they were at z-index -20 behind the page's opaque gradient and invisible)
 function Confetti({ celebrate }: {celebrate: boolean;}) {
-  const pieces = useMemo(() => Array.from({ length: 50 }).map((_, i) => ({
-    id: i,
-    left: ((i * 17 + 3) % 100),
-    delay: ((i * 0.45) % 3),
-    size: 6 + ((i * 2.1) % 8),
-    color: (["#FFE66D", "#E0E0E0", "#ffffff"] as const)[i % 3],
-    duration: 5 + ((i * 1.4) % 6)
-  })), []);
-
-  // Burst confetti on load
+  // Burst confetti on load — visible at z-index 1000
   useEffect(() => {
     if (!celebrate || typeof window === 'undefined') return;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1024,26 +1017,7 @@ function Confetti({ celebrate }: {celebrate: boolean;}) {
     };
   }, [celebrate]);
 
-  return (
-    <div aria-hidden className="pointer-events-none fixed inset-0 -z-20 overflow-hidden">
-      <style>{`@keyframes fall { to { transform: translateY(110vh) rotate(1turn); opacity: .9; } }`}</style>
-      {pieces.map((p) => (
-        <span
-          key={p.id}
-          className="absolute top-[-10vh] rounded"
-          style={{
-            left: `${p.left}%`,
-            width: p.size,
-            height: p.size,
-            background: p.color,
-            filter: 'drop-shadow(0 0 6px rgba(224,224,224,.6))',
-            animation: `fall ${p.duration}s linear ${p.delay}s infinite`,
-            willChange: 'transform'
-          }}
-        />
-      ))}
-    </div>
-  );
+  return null;
 }
 
 // Fireworks with initial bursts and visibility-aware continuous effect
@@ -1113,19 +1087,12 @@ function Fireworks({ celebrate }: {celebrate: boolean;}) {
       }, 500);
     }
 
-    let frame = 0;
     let raf: number;
     let isRunning = true;
 
     const loop = () => {
       if (!isRunning) return;
-      raf = requestAnimationFrame(loop);
-      frame++;
       ctx.clearRect(0, 0, w, h);
-      // Continuous background bursts
-      if (frame % 60 === 0) {
-        burst(Math.random() * w, h * 0.2 + Math.random() * h * 0.5, false);
-      }
       // Update particles
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
@@ -1147,8 +1114,8 @@ function Fireworks({ celebrate }: {celebrate: boolean;}) {
         ctx.fill();
         ctx.shadowBlur = 0;
       }
-      // Cleanup check
-      if (particles.length === 0 && !celebrateRef.current && frame > 300) {
+      // Stop RAF when all particles are done (no more continuous generation)
+      if (particles.length === 0 && !burstInterval) {
         cancelAnimationFrame(raf);
         if (document.body.contains(canvas)) {
           document.body.removeChild(canvas);
@@ -1158,6 +1125,7 @@ function Fireworks({ celebrate }: {celebrate: boolean;}) {
         isRunning = false;
         return;
       }
+      raf = requestAnimationFrame(loop);
     };
 
     const onVisibilityChange = () => {
@@ -1187,11 +1155,16 @@ function Fireworks({ celebrate }: {celebrate: boolean;}) {
 }
 
 // Sparkle cursor using on-demand RAF emitter (stops rendering when mouse is static)
+// Skips initialisation on touch-only devices where cursor trail is useless
 function SparkleCursor() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) return;
+
+    // Skip on touch-only devices (no mouse pointer)
+    const hasPointer = window.matchMedia('(pointer: fine)').matches;
+    if (!hasPointer) return;
 
     const canvas = document.createElement('canvas');
     canvas.className = 'fixed inset-0 z-50 pointer-events-none';
@@ -2304,45 +2277,10 @@ function Footer() {
 
 }
 
-function FloatingParticles() {
-  const particles = useMemo(() => Array.from({ length: 20 }).map((_, i) => ({
-    id: i,
-    delay: ((i * 1.7) % 10),
-    duration: 15 + ((i * 3.1) % 10),
-    left: ((i * 19 + 7) % 100),
-    size: 4 + ((i * 2.3) % 8),
-    color: ['#FFD700', '#6EC6FF', '#1A237E', '#D7C4F3', '#B9FBC0'][i % 5]
-  })), []);
-
-  return (
-    <div className="pointer-events-none fixed inset-0 -z-20 overflow-hidden">
-      {particles.map((p) =>
-      <motion.div
-        key={p.id}
-        className="absolute rounded-full opacity-60 blur-sm"
-        style={{
-          left: `${p.left}%`,
-          top: '-10%',
-          width: p.size,
-          height: p.size,
-          backgroundColor: p.color,
-          boxShadow: `0 0 10px ${p.color}40`,
-          willChange: 'transform'
-        }}
-        initial={{ y: '-100vh' }}
-        animate={{
-          y: '120vh',
-          rotate: 360
-        }}
-        transition={{
-          duration: p.duration,
-          delay: p.delay,
-          repeat: Infinity,
-          ease: 'linear'
-        }} />
-      )}
-    </div>);
-}
+// FloatingParticles removed — 20 framer-motion animated divs at z-index -20
+// were fully hidden behind the page's opaque bg-gradient-to-br from-blue-100
+// via-purple-100 to-pink-100. Each had will-change: transform and infinite
+// animation, wasting 20 compositor layers for zero visible effect.
 
 const MemoizedNavbar = React.memo(Navbar);
 const MemoizedParallaxBackground = React.memo(ParallaxBackground);
@@ -2351,4 +2289,3 @@ const MemoizedLeadersGrid = React.memo(LeadersGrid);
 const MemoizedFAQ = React.memo(FAQ);
 const MemoizedContact = React.memo(Contact);
 const MemoizedFooter = React.memo(Footer);
-const MemoizedFloatingParticles = React.memo(FloatingParticles);

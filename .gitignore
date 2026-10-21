@@ -44,3 +44,6 @@ next-env.d.ts
 
 # Temporary test scratch files
 scratch/
+
+# Local SQLite database (may contain applicant PII)
+local.db
