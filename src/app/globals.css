@@ -187,6 +187,8 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    max-width: 100%;
+    overflow-x: clip;
   }
   * {
     @apply border-border outline-ring/50;
@@ -194,7 +196,9 @@
   body {
     @apply bg-background text-foreground;
     font-family: Inter, var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+    max-width: 100%;
     overflow-x: clip;
+    position: relative;
   }
 }
 

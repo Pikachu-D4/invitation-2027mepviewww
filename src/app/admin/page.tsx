@@ -632,7 +632,7 @@ export default function AdminPage() {
   // Login View
   if (!authenticated) {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 px-4 py-10">
+      <main className="min-h-screen w-full max-w-full overflow-x-clip flex items-center justify-center bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 px-4 py-10">
         <Card className="w-full max-w-md bg-white/80 backdrop-blur-md border-white/50 shadow-xl">
           <CardHeader className="text-center">
             <div className="mx-auto w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 mb-2">
@@ -682,7 +682,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-purple-50/40 text-gray-900">
+    <div className="min-h-screen w-full max-w-full overflow-x-clip bg-gradient-to-br from-slate-50 via-blue-50/40 to-purple-50/40 text-gray-900">
       {/* Top Navigation Bar */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-white/60 shadow-sm">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between gap-4">

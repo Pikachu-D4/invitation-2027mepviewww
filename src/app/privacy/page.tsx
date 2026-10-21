@@ -9,7 +9,7 @@ export const metadata = {
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100">
+    <div className="min-h-screen w-full max-w-full overflow-x-clip bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100">
       {/* Header */}
       <header className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-[rgba(255,255,255,0.6)] bg-[rgba(255,255,255,0.6)] border-b border-[rgba(255,255,255,0.3)]">
         <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">

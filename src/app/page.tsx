@@ -364,7 +364,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 text-[#333333] relative">
+    <div className="min-h-screen w-full max-w-full overflow-x-clip bg-gradient-to-br from-blue-100 via-purple-100 to-pink-100 text-[#333333] relative">
       {/* Animated backgrounds */}
       <Fireworks celebrate={celebrate} />
       <Confetti celebrate={celebrate} />
@@ -452,37 +452,36 @@ function ParallaxBackground() {
   const y2 = useTransform(scrollYProgress, [0, 1], [0, -50]);
 
   return (
-    <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10">
+    <div className="pointer-events-none fixed inset-0 overflow-hidden max-w-full w-full -z-10">
       <motion.div
-        className="absolute -top-40 left-1/2 -translate-x-1/2 h-[28rem] w-[28rem] rounded-full blur-3xl opacity-60"
+        className="absolute -top-40 left-1/2 -translate-x-1/2 h-72 w-72 sm:h-[28rem] sm:w-[28rem] rounded-full blur-3xl opacity-60"
         style={{
           background: "radial-gradient(closest-side, #A7D8FF, transparent 70%)",
           y: y1
         }} />
 
       <motion.div
-        className="absolute top-1/2 -right-24 h-[28rem] w-[28rem] rounded-full blur-3xl opacity-50"
+        className="absolute top-1/2 -right-12 sm:-right-24 h-72 w-72 sm:h-[28rem] sm:w-[28rem] rounded-full blur-3xl opacity-50"
         style={{
           background: "radial-gradient(closest-side, #B9FBC0, transparent 70%)",
           y: y2
         }} />
 
       <motion.div
-        className="absolute -bottom-32 -left-20 h-[22rem] w-[22rem] rounded-full blur-3xl opacity-50"
+        className="absolute -bottom-32 -left-12 sm:-left-20 h-64 w-64 sm:h-[22rem] sm:w-[22rem] rounded-full blur-3xl opacity-50"
         style={{
           background: "radial-gradient(closest-side, #FFD6E0, transparent 70%)",
           y: y1
         }} />
 
       <motion.div
-        className="absolute top-[20%] left-[10%] h-40 w-40 rounded-full blur-2xl opacity-60"
+        className="absolute top-[20%] left-[10%] h-32 w-32 sm:h-40 sm:w-40 rounded-full blur-2xl opacity-60"
         style={{
           background: "radial-gradient(closest-side, #D7C4F3, transparent 70%)",
           y: y2
         }} />
 
     </div>);
-
 }
 
 function Navbar({ filled, total }: {filled: number;total: number;}) {
@@ -737,8 +736,8 @@ const Hero = React.memo(function Hero({
   if (!hero || !hero.visible) return null;
 
   return (
-    <section id="hero" className="relative overflow-hidden">
-      <div className="relative mx-auto max-w-6xl px-4 pt-20 pb-24 md:pt-28 md:pb-32 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+    <section id="hero" className="relative overflow-hidden w-full bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
+      <div className="relative mx-auto max-w-6xl px-4 pt-20 pb-24 md:pt-28 md:pb-32 w-full">
         {/* Glossy invitation box with liquid-glass UI */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
@@ -752,9 +751,9 @@ const Hero = React.memo(function Hero({
           <div className="liquid-bg pointer-events-none"></div>
           {celebrate && (
             <motion.div
-              className="pointer-events-none absolute inset-0 bg-gradient-to-br from-gold/20 via-transparent to-blue-100/20 rounded-3xl blur-3xl opacity-70"
+              className="pointer-events-none absolute inset-0 bg-gradient-to-br from-gold/20 via-transparent to-blue-100/20 rounded-3xl blur-2xl opacity-70"
               initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1.5, opacity: 0.8 }}
+              animate={{ scale: 1.05, opacity: 0.8 }}
               transition={{ duration: 3, repeat: 1 }}
             />
           )}
@@ -967,22 +966,26 @@ function GoldenSparkles({ celebrate }: {celebrate: boolean;}) {
 // Confetti burst on celebration (the 50 continuous falling pieces were removed —
 // they were at z-index -20 behind the page's opaque gradient and invisible)
 function Confetti({ celebrate }: {celebrate: boolean;}) {
-  // Burst confetti on load — visible at z-index 1000
+  // Burst confetti on load — visible at z-index 1000 inside overflow-hidden container
   useEffect(() => {
     if (!celebrate || typeof window === 'undefined') return;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (prefersReducedMotion) return;
 
+    const container = document.createElement('div');
+    container.className = 'fixed inset-0 pointer-events-none overflow-hidden max-w-full w-full';
+    container.style.zIndex = '1000';
+    document.body.appendChild(container);
+
     const burstPieces = Array.from({ length: 200 }).map((_, i) => i);
     const centerX = window.innerWidth / 2;
     const centerY = window.innerHeight / 2;
-    const createdSparks: HTMLDivElement[] = [];
 
     burstPieces.forEach((_, i) => {
       const angle = Math.PI * 2 * i / burstPieces.length;
       const velocity = 5 + Math.random() * 10;
       const spark = document.createElement('div');
-      spark.style.position = 'fixed';
+      spark.style.position = 'absolute';
       spark.style.left = `${centerX}px`;
       spark.style.top = `${centerY}px`;
       spark.style.width = '6px';
@@ -990,9 +993,7 @@ function Confetti({ celebrate }: {celebrate: boolean;}) {
       spark.style.backgroundColor = ['#FFD700', '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'][Math.floor(Math.random() * 5)];
       spark.style.borderRadius = '50%';
       spark.style.pointerEvents = 'none';
-      spark.style.zIndex = '1000';
-      document.body.appendChild(spark);
-      createdSparks.push(spark);
+      container.appendChild(spark);
 
       const anim = spark.animate([
         { transform: 'translate(0, 0) scale(1)', opacity: 1 },
@@ -1007,13 +1008,16 @@ function Confetti({ celebrate }: {celebrate: boolean;}) {
 
       anim.onfinish = () => {
         spark.remove();
-        const idx = createdSparks.indexOf(spark);
-        if (idx !== -1) createdSparks.splice(idx, 1);
+        if (container.children.length === 0 && document.body.contains(container)) {
+          container.remove();
+        }
       };
     });
 
     return () => {
-      createdSparks.forEach((s) => s.remove());
+      if (document.body.contains(container)) {
+        container.remove();
+      }
     };
   }, [celebrate]);
 
@@ -1274,7 +1278,7 @@ function SectionWithParallax({ children }: {children: React.ReactNode;}) {
   const y = useTransform(scrollYProgress, [0, 1], [0, 20]);
 
   return (
-    <motion.section style={{ y }} className="relative">
+    <motion.section style={{ y }} className="relative w-full max-w-full">
       {children}
     </motion.section>);
 
@@ -1829,8 +1833,8 @@ function ApplicationForm(props: {
         </div>
 
         {/* Right Column: Form or Success Confirmation Card */}
-        <Card className="bg-[rgba(255,255,255,0.6)] border-[rgba(255,255,255,0.4)] backdrop-blur-xl shadow-[0_8px_32px_0_rgba(31,38,135,0.07)]">
-          <CardContent className="pt-6">
+        <Card className="bg-[rgba(255,255,255,0.6)] border-[rgba(255,255,255,0.4)] backdrop-blur-xl shadow-[0_8px_32px_0_rgba(31,38,135,0.07)] overflow-hidden w-full max-w-full">
+          <CardContent className="p-4 sm:p-6 pt-4 sm:pt-6">
             {submissionSuccess ? (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -2053,7 +2057,7 @@ function ApplicationForm(props: {
                       </div>
 
                       {/* Position Grid: 3 specific positions */}
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                         {(requestedRole === "Leader" ? [1, 2, 3] : [4, 5, 6]).map((pos) => {
                           const slot = leaders.find((l) => l.position === pos);
                           const isOccupied = slot?.status === 'filled';
@@ -2064,20 +2068,20 @@ function ApplicationForm(props: {
                               key={pos}
                               type="button"
                               onClick={() => onRequestedPosition(pos)}
-                              className={`p-2.5 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-1 ${
+                              className={`p-1.5 sm:p-2.5 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-0.5 sm:gap-1 min-w-0 overflow-hidden ${
                                 isSelected
                                   ? "border-blue-600 bg-blue-50 ring-2 ring-blue-300 shadow-sm"
                                   : "border-gray-200 bg-white/70 hover:bg-white"
                               }`}
                             >
-                              <span className="text-xs font-bold text-gray-900">
+                              <span className="text-2xs sm:text-xs font-bold text-gray-900 truncate w-full block">
                                 {requestedRole === "Leader" ? `Leader #${pos}` : `Co-Leader #${pos - 3}`}
                               </span>
-                              <span className="text-2xs text-gray-500 font-mono">
+                              <span className="text-3xs sm:text-2xs text-gray-500 font-mono truncate w-full block">
                                 Slot #{pos}
                               </span>
                               <span
-                                className={`text-3xs uppercase font-bold px-1.5 py-0.5 rounded-full ${
+                                className={`text-3xs uppercase font-bold px-1 sm:px-1.5 py-0.5 rounded-full ${
                                   isOccupied
                                     ? "bg-amber-100 text-amber-800 border border-amber-300"
                                     : "bg-emerald-100 text-emerald-800 border border-emerald-300"
@@ -2125,12 +2129,12 @@ function ApplicationForm(props: {
                 </div>
 
                 {/* Profile Picture Upload */}
-                <div>
+                <div className="w-full min-w-0">
                   <label className="text-sm font-medium text-gray-800 block mb-1">
                     Profile Picture <span className="text-rose-500">*</span>
                   </label>
-                  <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 rounded-full overflow-hidden border border-gray-200 shadow-sm bg-white/70 flex items-center justify-center flex-shrink-0">
+                  <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full overflow-hidden border border-gray-200 shadow-sm bg-white/70 flex items-center justify-center flex-shrink-0">
                       {profilePreview ? (
                         <img src={profilePreview} alt="Preview" className="h-full w-full object-cover" />
                       ) : (
@@ -2139,13 +2143,13 @@ function ApplicationForm(props: {
                     </div>
                     <label
                       htmlFor="profileImage"
-                      className="flex-1 cursor-pointer rounded-2xl border border-white/60 bg-white/60 backdrop-blur-md px-4 py-3 shadow-sm hover:shadow-md transition ring-1 ring-transparent hover:ring-[rgba(167,216,255,0.5)]"
+                      className="flex-1 min-w-0 cursor-pointer rounded-xl sm:rounded-2xl border border-white/60 bg-white/60 backdrop-blur-md px-3 sm:px-4 py-2.5 sm:py-3 shadow-sm hover:shadow-md transition ring-1 ring-transparent hover:ring-[rgba(167,216,255,0.5)] overflow-hidden"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-[#333333] truncate">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <span className="text-xs sm:text-sm text-[#333333] truncate min-w-0 flex-1">
                           {profilePreview ? 'Change image' : 'Choose JPG or PNG (max 5MB)'}
                         </span>
-                        <Button type="button" variant="outline" size="sm" className="glass-button text-[#333333] pointer-events-none">
+                        <Button type="button" variant="outline" size="sm" className="glass-button text-[#333333] pointer-events-none flex-shrink-0 text-xs px-2.5 py-1 h-7">
                           Browse…
                         </Button>
                       </div>
