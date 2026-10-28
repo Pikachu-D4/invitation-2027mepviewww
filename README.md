@@ -292,7 +292,3 @@ npm run start
 4. Deploy. Next.js handles static pre-rendering and dynamic route compilation automatically.
 
 ---
-
-## License
-
-This project is maintained for the MEP 2027 collaboration. Distributed under the [MIT License](LICENSE).
