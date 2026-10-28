@@ -59,6 +59,24 @@ A full-stack Next.js web application built for the **MEP 2027 Multi-Editor Proje
 
 ---
 
+## Mobile Responsive Layout & Viewport Architecture
+
+The platform is fortified against mobile viewport stretching, horizontal scrolling, and text truncation across all screen sizes (tested at 360px, 390px, 412px, 768px, 1280px, and 1440px):
+
+1. **Next.js 15 Viewport Specification**:
+   - Explicit `export const viewport: Viewport` in `src/app/layout.tsx` enforcing `width: 'device-width'`, `initialScale: 1`, and `maximumScale: 5`.
+2. **Defensive Layout Containment**:
+   - `html` and `body` in `src/app/globals.css` enforce `max-width: 100%` and `overflow-x: clip` (using modern `clip` instead of `hidden` to avoid interrupting mobile vertical scroll velocity).
+   - Root page wrappers (`src/app/page.tsx`, `src/app/privacy/page.tsx`, `src/app/admin/page.tsx`) enforce `w-full max-w-full overflow-x-clip`.
+3. **Flexbox Intrinsic Minimum Width Guard (`min-w-0`)**:
+   - Flex children without explicit `min-w-0` default to `min-width: auto`, preventing truncation and expanding forms beyond the mobile screen.
+   - Form upload rows, avatar badges, and position preference buttons are constrained with `min-w-0` and responsive padding (`p-4 sm:p-6`).
+4. **Encapsulated Dynamic Animation Lifecycle**:
+   - Burst celebration particles are generated inside an isolated, non-scrolling overlay container rather than directly on `document.body`, eliminating synthetic horizontal scroll width expansions.
+   - Parallax background radial spheres dynamically scale between mobile (`h-72 w-72`) and desktop (`h-[28rem] w-[28rem]`).
+
+---
+
 ## Project Specifications
 
 | Detail | Specification |
